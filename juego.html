@@ -1,0 +1,1569 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Pokémon: Regiones Gemelas</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Trebuchet MS',Arial,sans-serif;user-select:none;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;touch-action:none}
+canvas{display:block}
+#hud{position:fixed;top:0;left:0;right:0;padding:10px 16px;display:flex;justify-content:space-between;pointer-events:none;color:#fff;text-shadow:0 2px 4px #000;font-weight:bold;z-index:10}
+#hud .badge{background:linear-gradient(135deg,#ffd700,#ff8c00);color:#000;padding:4px 10px;border-radius:20px;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.5)}
+#prompt{position:fixed;top:110px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.9);color:#fff;padding:8px 18px;border-radius:30px;font-weight:bold;display:none;border:2px solid #ffd700;z-index:13;text-align:center;max-width:80%;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,.6)}
+#dialog{position:fixed;bottom:0;left:0;right:0;background:linear-gradient(180deg,rgba(20,20,40,.98),rgba(10,10,25,.98));color:#fff;padding:20px 30px;border-top:4px solid #ffd700;display:none;z-index:20;min-height:120px;cursor:pointer}
+#dialog .name{color:#ffd700;font-weight:bold;margin-bottom:8px;font-size:16px}
+#dialog .text{font-size:17px;line-height:1.5}
+#dialog .hint{position:absolute;bottom:8px;right:20px;font-size:12px;opacity:.6}
+#battle{position:fixed;inset:0;display:none;z-index:30;background:linear-gradient(180deg,#87ceeb 0%,#b0e0ff 50%,#7cb342 50%,#5d8a2f 100%)}
+.pk-sprite{position:absolute;image-rendering:pixelated;filter:drop-shadow(0 8px 12px rgba(0,0,0,.5))}
+#enemySprite{top:8%;right:8%;width:200px;height:200px}
+#playerSprite{bottom:22%;left:10%;width:220px;height:220px}
+.pk-sprite.mega{filter:drop-shadow(0 0 20px #ff00ff) drop-shadow(0 0 40px #00ffff) brightness(1.2)}
+.pk-sprite.shiny{filter:drop-shadow(0 0 15px #ffd700) drop-shadow(0 0 30px #ff8c00) brightness(1.3)}
+.hp-bar{position:absolute;background:rgba(20,20,30,.92);padding:10px 14px;border-radius:12px;border:3px solid #333;min-width:240px;box-shadow:0 4px 12px rgba(0,0,0,.5)}
+#enemyHp{top:5%;left:5%}#playerHp{bottom:38%;right:5%}
+.hp-bar .pname{color:#fff;font-weight:bold;font-size:15px;margin-bottom:4px;display:flex;justify-content:space-between;gap:8px}
+.hp-bar .lvl{color:#ffd700}
+.hp-track{background:#222;height:14px;border-radius:7px;overflow:hidden;border:2px solid #111}
+.hp-fill{height:100%;background:linear-gradient(180deg,#4caf50,#2e7d32);transition:width .4s;border-radius:5px}
+.hp-fill.warn{background:linear-gradient(180deg,#ffeb3b,#f9a825)}
+.hp-fill.crit{background:linear-gradient(180deg,#f44336,#b71c1c)}
+.hp-text{color:#fff;font-size:12px;text-align:right;margin-top:3px}
+.xp-track{background:#222;height:6px;border-radius:3px;overflow:hidden;margin-top:4px;border:1px solid #111}
+.xp-fill{height:100%;background:linear-gradient(90deg,#29b6f6,#0288d1);transition:width .4s}
+#battleUI{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(180deg,rgba(15,15,25,.95),rgba(5,5,15,1));padding:18px;display:grid;grid-template-columns:2fr 1fr;gap:14px;border-top:4px solid #ffd700;min-height:190px}
+#battleMsg{color:#fff;font-size:18px;padding:16px;background:rgba(0,0,0,.5);border-radius:10px;line-height:1.4;border-left:4px solid #ffd700}
+#moveList{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.moveBtn{background:linear-gradient(135deg,#3b4b7a,#1a2242);color:#fff;border:2px solid #5a6b9a;padding:12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:14px;text-align:left}
+.moveBtn:disabled{opacity:.4}
+.moveBtn .mtype{font-size:11px;color:#ffd700;display:block;margin-top:2px}
+#battleActions{grid-column:2;display:flex;flex-direction:column;gap:8px}
+.actBtn{background:linear-gradient(135deg,#7a3b3b,#421a1a);color:#fff;border:2px solid #a55;padding:10px;border-radius:8px;cursor:pointer;font-weight:bold}
+#megaBtn{background:linear-gradient(135deg,#8b00ff,#ff00ff);border-color:#ffd700;text-shadow:0 0 8px #fff;display:none}
+#title{position:fixed;inset:0;background:radial-gradient(circle at center,#1a1a4a 0%,#000 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;color:#fff;text-align:center;padding:20px}
+#title h1{font-size:60px;background:linear-gradient(180deg,#ffd700,#ff8c00,#ffd700);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:4px;margin-bottom:8px}
+#title h2{font-size:22px;color:#4fc3f7;margin-bottom:30px;letter-spacing:8px}
+#title button{background:linear-gradient(135deg,#ffd700,#ff8c00);color:#000;border:none;padding:16px 60px;font-size:20px;font-weight:bold;border-radius:40px;cursor:pointer;margin:6px}
+#title .info{margin-top:24px;opacity:.6;font-size:12px;max-width:600px;line-height:1.6}
+#loading{position:fixed;inset:0;background:#000;color:#ffd700;display:flex;align-items:center;justify-content:center;font-size:24px;z-index:200;flex-direction:column;gap:20px}
+.spinner{width:60px;height:60px;border:5px solid #333;border-top-color:#ffd700;border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#party{position:fixed;top:70px;right:16px;z-index:15;background:rgba(10,10,25,.92);border:2px solid #ffd700;border-radius:12px;padding:10px;display:none;color:#fff;min-width:220px;max-height:70vh;overflow-y:auto}
+#party h3{color:#ffd700;font-size:14px;margin-bottom:8px}
+.party-mon{display:flex;align-items:center;gap:8px;padding:6px;border-bottom:1px solid #333;font-size:13px}
+.party-mon img{width:40px;height:40px;image-rendering:pixelated}
+.party-mon .hpmini{background:#222;height:6px;border-radius:3px;flex:1;overflow:hidden}
+.party-mon .hpmini div{height:100%;background:#4caf50}
+#partyHUD{position:fixed;top:56px;left:8px;z-index:11;display:flex;flex-direction:column;gap:4px;pointer-events:none}
+.partySlot{background:linear-gradient(135deg,rgba(30,30,50,.88),rgba(10,10,25,.92));border:2px solid #ffd700;border-radius:30px;padding:3px 10px 3px 3px;display:flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(0,0,0,.6)}
+.partySlot img{width:34px;height:34px;image-rendering:pixelated}
+.partySlot .info{display:flex;flex-direction:column}
+.partySlot .pname{font-size:10px;color:#fff;font-weight:bold;line-height:1}
+.partySlot .plvl{font-size:9px;color:#ffd700}
+.partySlot .php{width:50px;height:4px;background:#222;border-radius:2px;overflow:hidden;margin-top:2px}
+.partySlot .php div{height:100%;background:linear-gradient(90deg,#4caf50,#8bc34a)}
+#regionText{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-size:42px;color:#fff;text-shadow:0 0 30px #ffd700;opacity:0;transition:opacity 1s;pointer-events:none;z-index:50;font-weight:bold;letter-spacing:6px;text-align:center}
+#loading2{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;color:#fff;font-size:20px;z-index:60;flex-direction:column;gap:14px}
+#touchControls{position:fixed;inset:0;pointer-events:none;z-index:12;display:none}
+body.mobile #touchControls{display:block}
+#joystick{position:absolute;bottom:40px;left:20px;width:130px;height:130px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.18),rgba(255,255,255,.06));border:3px solid rgba(255,255,255,.4);pointer-events:auto;touch-action:none;backdrop-filter:blur(6px)}
+#joystickKnob{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:55px;height:55px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#fff,#aac);pointer-events:none}
+#actionButtons{position:absolute;bottom:40px;right:20px;display:flex;flex-direction:column;gap:14px;align-items:flex-end;pointer-events:auto}
+.tbtn{width:76px;height:76px;border-radius:50%;border:3px solid rgba(255,255,255,.6);background:radial-gradient(circle at 35% 30%,#ff5566,#8b0020);color:#fff;font-size:26px;font-weight:900;box-shadow:0 6px 18px rgba(0,0,0,.55);cursor:pointer;touch-action:none}
+.tbtn:active{transform:scale(.9)}
+.tbtn.small{width:auto;height:44px;padding:0 16px;border-radius:22px;font-size:14px;background:linear-gradient(135deg,#3b4b7a,#1a2242)}
+#shop,#pokedex,#pcUI{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:80;display:none;align-items:center;justify-content:center;padding:20px}
+.panel{background:linear-gradient(180deg,#1e2a4a,#0a0f1f);border:4px solid #ffd700;border-radius:16px;padding:20px;max-width:560px;width:100%;max-height:88vh;overflow-y:auto;color:#fff}
+.panel h2{color:#ffd700;text-align:center;margin-bottom:6px;font-size:22px}
+.money{text-align:center;color:#7cff7c;font-weight:bold;margin-bottom:14px}
+.shopItem{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.05);border:2px solid #3b4b7a;border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.shopItem .icon{font-size:26px}.shopItem .info{flex:1}
+.shopItem .name{font-weight:bold;font-size:15px}
+.shopItem .desc{font-size:12px;opacity:.75}
+.shopItem .price{color:#ffd700;font-weight:bold;font-size:13px;margin-top:2px}
+.shopItem button{background:linear-gradient(135deg,#2a8b3a,#0f4a1a);color:#fff;border:2px solid #4caf50;padding:8px 16px;border-radius:8px;font-weight:bold;cursor:pointer}
+.shopItem button:disabled{opacity:.4}
+.panelClose{display:block;margin:14px auto 0;background:linear-gradient(135deg,#a02020,#601010);color:#fff;border:2px solid #ff6666;padding:10px 30px;border-radius:8px;font-weight:bold;cursor:pointer}
+#planeTransition{position:fixed;inset:0;background:#000;z-index:150;display:none;align-items:center;justify-content:center;flex-direction:column;color:#fff;overflow:hidden}
+#planeTransition .sky{position:absolute;inset:0;background:linear-gradient(180deg,#4fc3f7,#b3e5fc)}
+#planeTransition .clouds{position:absolute;inset:0;background:radial-gradient(ellipse 200px 60px at 20% 30%,rgba(255,255,255,.9),transparent),radial-gradient(ellipse 260px 80px at 70% 60%,rgba(255,255,255,.8),transparent);animation:cloudMove 6s linear infinite}
+@keyframes cloudMove{from{transform:translateX(0)}to{transform:translateX(-100vw)}}
+#planeTransition .plane{font-size:80px;animation:planeFly 4s ease-in-out;z-index:2}
+@keyframes planeFly{0%{transform:translate(-60vw,20vh) rotate(10deg)}100%{transform:translate(80vw,-30vh) rotate(-15deg)}}
+#planeTransition .text{position:absolute;bottom:20%;font-size:22px;font-weight:bold;z-index:2}
+#zoneFade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:180;transition:opacity .35s}
+#evolution{position:fixed;inset:0;background:radial-gradient(circle at center,#1a1a4a 0%,#000 100%);display:none;align-items:center;justify-content:center;flex-direction:column;z-index:120;color:#fff}
+#evolution img{width:200px;height:200px;image-rendering:pixelated;filter:drop-shadow(0 0 30px #fff);transition:transform .2s}
+#evolution .flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .15s}
+#evolution .msg{margin-top:30px;font-size:24px;font-weight:bold;text-shadow:0 0 20px #ffd700;text-align:center;padding:0 20px}
+#pokedex .panel{background:linear-gradient(180deg,#c8102e 0%,#8b0018 100%);max-width:840px}
+.pdex-filters{display:flex;gap:6px;margin-bottom:8px;justify-content:center}
+.pdex-filter{background:rgba(0,0,0,.4);color:#fff;border:2px solid #ffd700;border-radius:16px;padding:5px 14px;font-size:12px;font-weight:bold;cursor:pointer}
+.pdex-filter.active{background:#ffd700;color:#8b0018}
+.pdex-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:6px;overflow-y:auto;padding:4px;background:rgba(0,0,0,.3);border-radius:10px;max-height:60vh}
+.pdex-cell{background:linear-gradient(180deg,#fff,#eee);border:2px solid #333;border-radius:8px;padding:4px;text-align:center;cursor:pointer;position:relative}
+.pdex-cell.locked{background:linear-gradient(180deg,#555,#333);border-color:#222}
+.pdex-cell.locked .pdex-num{color:#ffd700}
+.pdex-cell.locked .pdex-name{color:#888}
+.pdex-cell img{width:56px;height:56px;image-rendering:pixelated}
+.pdex-cell.locked img{filter:brightness(0) contrast(0)}
+.pdex-num{position:absolute;top:2px;left:4px;font-size:9px;font-weight:bold;color:#333}
+.pdex-name{font-size:9px;font-weight:bold;color:#111;text-transform:capitalize;line-height:1.1;margin-top:2px}
+.pdex-cell.caught::after{content:"✓";position:absolute;top:2px;right:4px;font-size:12px;color:#4caf50;font-weight:bold}
+#musicBtn,#dexBtn{position:fixed;top:56px;z-index:14;width:40px;height:40px;border-radius:50%;color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;border:2px solid #ffd700;box-shadow:0 4px 12px rgba(0,0,0,.5)}
+#musicBtn{right:16px;background:linear-gradient(135deg,#3b4b7a,#1a2242)}
+#musicBtn.off{opacity:.4}
+#dexBtn{right:64px;background:linear-gradient(135deg,#c8102e,#8b0018)}
+#saveNotify{position:fixed;bottom:20px;right:20px;background:linear-gradient(135deg,#2a8b3a,#0f4a1a);color:#fff;padding:10px 18px;border-radius:20px;border:2px solid #4caf50;font-weight:bold;font-size:13px;z-index:170;opacity:0;transition:opacity .4s;pointer-events:none}
+#saveNotify.show{opacity:1}
+#resetBtn{position:fixed;top:8px;right:8px;background:rgba(120,20,20,.7);color:#fff;padding:4px 10px;border-radius:12px;border:2px solid #ff6666;font-size:10px;cursor:pointer;z-index:11;font-weight:bold;opacity:.7}
+#resetBtn:hover{opacity:1}
+#timeIndicator{position:fixed;top:56px;left:8px;z-index:10;background:rgba(0,0,0,.5);color:#fff;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:bold}
+.pcContent{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+.pcBox{background:rgba(0,0,0,.4);border:2px solid #3b4b7a;border-radius:10px;padding:8px;max-height:50vh;overflow-y:auto}
+.pcBox h3{color:#ffd700;font-size:13px;margin-bottom:6px;text-align:center;border-bottom:1px solid #ffd700;padding-bottom:4px}
+.pcMon{display:flex;align-items:center;gap:6px;padding:5px;border-bottom:1px solid #333;font-size:12px;cursor:pointer;border-radius:6px}
+.pcMon:hover{background:rgba(255,215,0,.15)}
+.pcMon img{width:36px;height:36px;image-rendering:pixelated}
+.pcMon .pcInfo{flex:1}
+.pcMon .pcName{font-weight:bold;color:#fff;font-size:12px}
+.pcMon .pcLvl{color:#ffd700;font-size:10px}
+.pcEmpty{text-align:center;color:#666;font-size:12px;padding:20px}
+#chapterOverlay{position:fixed;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.95),rgba(10,5,30,.98));z-index:200;display:none;align-items:center;justify-content:center;opacity:0;transition:opacity .6s}
+#chapterOverlay.show{display:flex;opacity:1}
+.chapterBox{text-align:center;color:#fff;padding:20px;animation:chapZoom .8s ease-out}
+.chapterNumber{font-size:16px;color:#4fc3f7;letter-spacing:8px;margin-bottom:10px;text-shadow:0 0 15px #4fc3f7}
+.chapterTitle{font-size:52px;font-weight:900;background:linear-gradient(180deg,#ffd700,#ff8c00,#ffd700);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:4px;margin-bottom:14px;filter:drop-shadow(0 0 20px rgba(255,215,0,.6))}
+.chapterSub{font-size:20px;color:#ccc;letter-spacing:2px;font-style:italic}
+@keyframes chapZoom{0%{transform:scale(.5);opacity:0}100%{transform:scale(1);opacity:1}}
+#cutscene{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:190;display:none;align-items:flex-end;justify-content:center;padding:20px}
+#cutscene.show{display:flex}
+.cutBox{background:linear-gradient(180deg,#1a1a3a,#0a0a20);border:3px solid #4fc3f7;border-radius:16px;padding:20px 26px;max-width:700px;width:100%;color:#fff;position:relative;box-shadow:0 0 40px rgba(79,195,247,.4);cursor:pointer}
+.cutChar{position:absolute;top:-80px;right:20px;font-size:60px;filter:drop-shadow(0 4px 12px rgba(0,0,0,.8))}
+.cutName{color:#4fc3f7;font-weight:bold;font-size:18px;margin-bottom:10px;letter-spacing:2px}
+.cutText{font-size:16px;line-height:1.6;min-height:70px}
+.cutText .em{color:#ffd700;font-weight:bold}
+.cutText .danger{color:#ff4444;font-weight:bold;text-shadow:0 0 8px #ff0000}
+.cutContinue{margin-top:12px;color:#888;font-size:12px;text-align:right}
+#missionHud{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:11;background:linear-gradient(135deg,rgba(30,20,60,.92),rgba(10,5,30,.96));border:2px solid #4fc3f7;border-radius:12px;padding:6px 14px;color:#fff;max-width:340px;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,.5);text-align:center}
+.missionLabel{font-size:10px;color:#4fc3f7;font-weight:bold;letter-spacing:2px;margin-bottom:3px}
+.missionText{font-size:12px;color:#fff;line-height:1.4}
+@media (max-width:900px){
+#hud .badge{font-size:11px;padding:3px 8px}
+#missionHud{max-width:240px;padding:5px 10px;bottom:8px}
+.missionText{font-size:10px}
+.missionLabel{font-size:9px}
+#prompt{top:90px;font-size:12px;padding:6px 14px;max-width:75%}
+#resetBtn{top:6px;right:6px;font-size:9px;padding:3px 8px}
+#dialog{padding:14px 18px;min-height:100px}#dialog .text{font-size:14px}
+#battleUI{padding:10px;min-height:170px;grid-template-columns:1.2fr 1fr;gap:8px}
+#battleMsg{font-size:14px;padding:10px}
+.moveBtn{font-size:12px;padding:9px}.moveBtn .mtype{font-size:10px}
+.actBtn{font-size:11px;padding:8px}
+#enemySprite{width:130px;height:130px;top:10%;right:5%}
+#playerSprite{width:150px;height:150px;bottom:24%;left:5%}
+.hp-bar{min-width:170px;padding:7px 10px}.hp-bar .pname{font-size:13px}
+#title h1{font-size:42px}#title h2{font-size:16px;letter-spacing:4px}
+#title button{padding:12px 40px;font-size:16px}
+#regionText{font-size:26px}
+#partyHUD{transform:scale(.82);transform-origin:top left}
+#evolution img{width:150px;height:150px}#evolution .msg{font-size:18px}
+#musicBtn,#dexBtn{top:56px;width:36px;height:36px;font-size:15px}
+#musicBtn{right:8px}#dexBtn{right:52px}
+.pdex-grid{grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:4px}
+.pdex-cell img{width:44px;height:44px}.pdex-name{font-size:8px}
+.pcContent{grid-template-columns:1fr}
+.chapterTitle{font-size:32px}.chapterSub{font-size:14px}.chapterNumber{font-size:12px}
+#joystick{bottom:30px;left:14px;width:115px;height:115px}
+#joystickKnob{width:48px;height:48px}
+#actionButtons{bottom:34px;right:14px;gap:10px}
+.tbtn{width:66px;height:66px;font-size:22px}
+.tbtn.small{height:38px;padding:0 14px;font-size:12px}
+}
+</style>
+</head>
+<body>
+
+<div id="loading"><div class="spinner"></div><div>Cargando Regiones Gemelas...</div></div>
+<div id="loading2"><div class="spinner"></div><div id="loading2text">Entrando...</div></div>
+<div id="zoneFade"></div>
+
+<div id="title" style="display:none">
+  <h1>POKÉMON</h1>
+  <h2>REGIONES GEMELAS</h2>
+  <button id="startBtn">NUEVA PARTIDA</button>
+  <div class="info">16 Gimnasios · 2 Regiones · 200+ Pokémon · Shiny · Mega Evoluciones · Team Eclipse · Post-Game · Gráficos 3D mejorados</div>
+</div>
+
+<div id="hud" style="display:none">
+  <div><span class="badge" id="badgeDisplay">🏅 0/16</span></div>
+  <div><span class="badge" id="zoneDisplay" style="background:linear-gradient(135deg,#4fc3f7,#0288d1);color:#fff;padding:4px 10px;border-radius:20px;font-size:13px">Pueblo Inicio</span></div>
+  <div><span class="badge" id="moneyDisplay">₽ 3000</span></div>
+</div>
+
+<div id="timeIndicator">☀️ Día</div>
+<div id="partyHUD"></div>
+<div id="prompt"></div>
+<div id="dialog"><div class="name"></div><div class="text"></div><div class="hint">▶ Toca / Espacio</div></div>
+<div id="party"><h3>EQUIPO (máx 6)</h3><div id="partyList"></div></div>
+<div id="regionText"></div>
+
+<button id="dexBtn" title="Pokédex">📖</button>
+<button id="musicBtn" title="Música">🎵</button>
+<div id="saveNotify">💾 Partida guardada</div>
+<div id="missionHud"><div class="missionLabel">📜 MISIÓN</div><div class="missionText" id="missionText">Habla con el Profesor Oak</div></div>
+
+<div id="touchControls">
+  <div id="joystick"><div id="joystickKnob"></div></div>
+  <div id="actionButtons">
+    <button class="tbtn" id="btnA">A</button>
+    <button class="tbtn" id="btnB">B<span style="font-size:10px;display:block;margin-top:-2px">CORRER</span></button>
+    <button class="tbtn small" id="btnP">EQUIPO</button>
+  </div>
+</div>
+
+<div id="evolution"><div class="flash" id="evoFlash"></div><img id="evoImg" src=""><div class="msg" id="evoMsg">¡Qué? ¡Está evolucionando!</div></div>
+
+<div id="battle">
+  <img id="enemySprite" class="pk-sprite" src="">
+  <img id="playerSprite" class="pk-sprite" src="">
+  <div id="enemyHp" class="hp-bar">
+    <div class="pname"><span id="enemyName"></span><span class="lvl" id="enemyLvl"></span></div>
+    <div class="hp-track"><div class="hp-fill" id="enemyHpFill"></div></div>
+  </div>
+  <div id="playerHp" class="hp-bar">
+    <div class="pname"><span id="playerBName"></span><span class="lvl" id="playerBLvl"></span></div>
+    <div class="hp-track"><div class="hp-fill" id="playerHpFill"></div></div>
+    <div class="hp-text" id="playerHpText"></div>
+    <div class="xp-track"><div class="xp-fill" id="playerXpFill" style="width:0%"></div></div>
+  </div>
+  <div id="battleUI">
+    <div id="battleMsg">¡Un Pokémon salvaje apareció!</div>
+    <div id="battleActions">
+      <button class="actBtn" id="megaBtn">⚡ MEGA</button>
+      <button class="actBtn" id="potionBtn">🧪 Poción</button>
+      <button class="actBtn" id="ballBtn">🔴 Pokéball</button>
+      <button class="actBtn" id="runBtn">🏃 Huir</button>
+    </div>
+    <div id="moveList"></div>
+  </div>
+</div>
+
+<div id="shop"><div class="panel"><h2>🏪 TIENDA POKÉMON</h2><div class="money">₽ <span id="shopMoney">0</span></div><div id="shopItems"></div><button class="panelClose" id="shopClose">CERRAR</button></div></div>
+<div id="pokedex"><div class="panel"><h2>📖 POKÉDEX</h2><div class="money" style="color:#fff">Vistos: <b id="dexSeen">0</b> · Capturados: <b id="dexCaught">0</b> / <b id="dexTotal">0</b></div><div class="pdex-filters"><button class="pdex-filter active" data-filter="all">Todos</button><button class="pdex-filter" data-filter="caught">Capturados</button><button class="pdex-filter" data-filter="seen">Vistos</button></div><div class="pdex-grid" id="pdexGrid"></div><button class="panelClose" id="pdexClose">CERRAR</button></div></div>
+<div id="pcUI"><div class="panel"><h2>💻 PC DE ALMACENAMIENTO</h2><div class="money" style="color:#fff">Equipo: <b id="pcPartyCount">0</b>/6 · Caja: <b id="pcBoxCount">0</b></div><div class="pcContent"><div class="pcBox"><h3>EQUIPO</h3><div id="pcPartyList"></div></div><div class="pcBox"><h3>CAJA</h3><div id="pcBoxList"></div></div></div><button class="panelClose" id="pcClose">CERRAR</button></div></div>
+
+<div id="planeTransition"><div class="sky"></div><div class="clouds"></div><div class="plane">✈️</div><div class="text" id="planeText">Volando...</div></div>
+
+<div id="chapterOverlay"><div class="chapterBox"><div class="chapterNumber">CAPÍTULO <span id="chapNum">1</span></div><div class="chapterTitle" id="chapTitle">El Despertar</div><div class="chapterSub" id="chapSub">Bienvenido a Kanto Nova</div></div></div>
+<div id="cutscene"><div class="cutBox"><div class="cutChar" id="cutChar"></div><div class="cutName" id="cutName">???</div><div class="cutText" id="cutText"></div><div class="cutContinue">▶ Toca para continuar</div></div></div>
+
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js"}}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+const SPRITE = id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+const BACK = id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/${id}.png`;
+const SPRITE_SHINY = id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${id}.png`;
+const BACK_SHINY = id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/shiny/${id}.png`;
+
+const MOVES = {
+"Tackle":{type:"Normal",power:40},"Scratch":{type:"Normal",power:40},"Body Slam":{type:"Normal",power:85},"Hyper Beam":{type:"Normal",power:150},"Quick Attack":{type:"Normal",power:40},"Extreme Speed":{type:"Normal",power:80},"Ember":{type:"Fire",power:40},"Flamethrower":{type:"Fire",power:90},"Fire Blast":{type:"Fire",power:110},"Fire Punch":{type:"Fire",power:75},"Vine Whip":{type:"Grass",power:45},"Razor Leaf":{type:"Grass",power:55},"Solar Beam":{type:"Grass",power:120},"Giga Drain":{type:"Grass",power:75},"Water Gun":{type:"Water",power:40},"Surf":{type:"Water",power:90},"Hydro Pump":{type:"Water",power:110},"Aqua Tail":{type:"Water",power:90},"Thunder Shock":{type:"Electric",power:40},"Thunderbolt":{type:"Electric",power:90},"Thunder":{type:"Electric",power:110},"Ice Beam":{type:"Ice",power:90},"Blizzard":{type:"Ice",power:110},"Ice Punch":{type:"Ice",power:75},"Psychic":{type:"Psychic",power:90},"Psybeam":{type:"Psychic",power:65},"Psystrike":{type:"Psychic",power:100},"Shadow Ball":{type:"Ghost",power:80},"Lick":{type:"Ghost",power:30},"Shadow Claw":{type:"Ghost",power:70},"Earthquake":{type:"Ground",power:100},"Dig":{type:"Ground",power:80},"Earth Power":{type:"Ground",power:90},"Rock Slide":{type:"Rock",power:75},"Stone Edge":{type:"Rock",power:100},"Dragon Claw":{type:"Dragon",power:80},"Dragon Pulse":{type:"Dragon",power:85},"Outrage":{type:"Dragon",power:120},"Dragon Dance":{type:"Dragon",power:0,status:"boost"},"Wing Attack":{type:"Flying",power:60},"Air Slash":{type:"Flying",power:75},"Brave Bird":{type:"Flying",power:120},"Peck":{type:"Flying",power:35},"Sludge Bomb":{type:"Poison",power:90},"Poison Jab":{type:"Poison",power:80},"Poison Sting":{type:"Poison",power:15},"Close Combat":{type:"Fighting",power:120},"Brick Break":{type:"Fighting",power:75},"Aura Sphere":{type:"Fighting",power:80},"Karate Chop":{type:"Fighting",power:50},"Iron Tail":{type:"Steel",power:100},"Flash Cannon":{type:"Steel",power:80},"Meteor Mash":{type:"Steel",power:90},"Bug Buzz":{type:"Bug",power:90},"X-Scissor":{type:"Bug",power:80},"Bug Bite":{type:"Bug",power:60},"Moonblast":{type:"Fairy",power:95},"Dazzling Gleam":{type:"Fairy",power:80},"Dark Pulse":{type:"Dark",power:80},"Crunch":{type:"Dark",power:80},"Bite":{type:"Dark",power:60},"Sleep Powder":{type:"Grass",power:0,status:"sleep"},"Thunder Wave":{type:"Electric",power:0,status:"paralyze"},"Toxic":{type:"Poison",power:0,status:"poison"},"Will-O-Wisp":{type:"Fire",power:0,status:"burn"},"Swords Dance":{type:"Normal",power:0,status:"boost"},"Calm Mind":{type:"Psychic",power:0,status:"boost"},"Harden":{type:"Normal",power:0,status:"boost"},"String Shot":{type:"Bug",power:0,status:"paralyze"}
+};
+
+const TYPE_CHART = {Normal:{Rock:.5,Ghost:0,Steel:.5},Fire:{Fire:.5,Water:.5,Grass:2,Ice:2,Bug:2,Rock:.5,Dragon:.5,Steel:2},Water:{Fire:2,Water:.5,Grass:.5,Ground:2,Rock:2,Dragon:.5},Electric:{Water:2,Electric:.5,Grass:.5,Ground:0,Flying:2,Dragon:.5},Grass:{Fire:.5,Water:2,Grass:.5,Poison:.5,Ground:2,Flying:.5,Bug:.5,Rock:2,Dragon:.5,Steel:.5},Ice:{Fire:.5,Water:.5,Grass:2,Ice:.5,Ground:2,Flying:2,Dragon:2,Steel:.5},Fighting:{Normal:2,Ice:2,Poison:.5,Flying:.5,Psychic:.5,Bug:.5,Rock:2,Ghost:0,Dark:2,Steel:2,Fairy:.5},Poison:{Grass:2,Poison:.5,Ground:.5,Rock:.5,Ghost:.5,Steel:0,Fairy:2},Ground:{Fire:2,Electric:2,Grass:.5,Poison:2,Flying:0,Bug:.5,Rock:2,Steel:2},Flying:{Electric:.5,Grass:2,Fighting:2,Bug:2,Rock:.5,Steel:.5},Psychic:{Fighting:2,Poison:2,Psychic:.5,Dark:0,Steel:.5},Bug:{Fire:.5,Grass:2,Fighting:.5,Poison:.5,Flying:.5,Psychic:2,Ghost:.5,Dark:2,Steel:.5,Fairy:.5},Rock:{Fire:2,Ice:2,Fighting:.5,Ground:.5,Flying:2,Bug:2,Steel:.5},Ghost:{Normal:0,Psychic:2,Ghost:2,Dark:.5},Dragon:{Dragon:2,Steel:.5,Fairy:0},Dark:{Fighting:.5,Psychic:2,Ghost:2,Dark:.5,Fairy:.5},Steel:{Fire:.5,Water:.5,Electric:.5,Ice:2,Rock:2,Steel:.5,Fairy:2},Fairy:{Fire:.5,Fighting:2,Poison:.5,Dragon:2,Dark:2,Steel:.5}};
+
+const TYPE_COLORS = {Normal:"#a8a878",Fire:"#f08030",Water:"#6890f0",Electric:"#f8d030",Grass:"#78c850",Ice:"#98d8d8",Fighting:"#c03028",Poison:"#a040a0",Ground:"#e0c068",Flying:"#a890f0",Psychic:"#f85888",Bug:"#a8b820",Rock:"#b8a038",Ghost:"#705898",Dragon:"#7038f8",Dark:"#705848",Steel:"#b8b8d0",Fairy:"#ee99ac"};
+
+const DEX = {
+1:{name:"Bulbasaur",types:["Grass","Poison"],stats:[45,49,49,65,65,45]},2:{name:"Ivysaur",types:["Grass","Poison"],stats:[60,62,63,80,80,60]},3:{name:"Venusaur",types:["Grass","Poison"],stats:[80,82,83,100,100,80],mega:{stats:[80,100,123,122,120,80]}},4:{name:"Charmander",types:["Fire"],stats:[39,52,43,60,50,65]},5:{name:"Charmeleon",types:["Fire"],stats:[58,64,58,80,65,80]},6:{name:"Charizard",types:["Fire","Flying"],stats:[78,84,78,109,85,100],mega:{stats:[78,104,78,159,115,100]}},7:{name:"Squirtle",types:["Water"],stats:[44,48,65,50,64,43]},8:{name:"Wartortle",types:["Water"],stats:[59,63,80,65,80,58]},9:{name:"Blastoise",types:["Water"],stats:[79,83,100,85,105,78],mega:{stats:[79,103,120,135,115,78]}},10:{name:"Caterpie",types:["Bug"],stats:[45,30,35,20,20,45]},11:{name:"Metapod",types:["Bug"],stats:[50,20,55,25,25,30]},12:{name:"Butterfree",types:["Bug","Flying"],stats:[60,45,50,90,80,70]},13:{name:"Weedle",types:["Bug","Poison"],stats:[40,35,30,20,20,50]},14:{name:"Kakuna",types:["Bug","Poison"],stats:[45,25,50,25,25,35]},15:{name:"Beedrill",types:["Bug","Poison"],stats:[65,90,40,45,80,75]},16:{name:"Pidgey",types:["Normal","Flying"],stats:[40,45,40,35,35,56]},17:{name:"Pidgeotto",types:["Normal","Flying"],stats:[63,60,55,50,50,71]},18:{name:"Pidgeot",types:["Normal","Flying"],stats:[83,80,75,70,70,101]},19:{name:"Rattata",types:["Normal"],stats:[30,56,35,25,35,72]},20:{name:"Raticate",types:["Normal"],stats:[55,81,60,50,70,97]},21:{name:"Spearow",types:["Normal","Flying"],stats:[40,60,30,31,31,70]},22:{name:"Fearow",types:["Normal","Flying"],stats:[65,90,65,61,61,100]},23:{name:"Ekans",types:["Poison"],stats:[35,60,44,40,54,55]},24:{name:"Arbok",types:["Poison"],stats:[60,95,69,65,79,80]},25:{name:"Pikachu",types:["Electric"],stats:[35,55,40,50,50,90]},26:{name:"Raichu",types:["Electric"],stats:[60,90,55,90,80,110]},27:{name:"Sandshrew",types:["Ground"],stats:[50,75,85,20,30,40]},28:{name:"Sandslash",types:["Ground"],stats:[75,100,110,45,55,65]},29:{name:"Nidoran-F",types:["Poison"],stats:[55,47,52,40,40,41]},30:{name:"Nidorina",types:["Poison"],stats:[70,62,67,55,55,56]},31:{name:"Nidoqueen",types:["Poison","Ground"],stats:[90,92,87,75,85,76]},32:{name:"Nidoran-M",types:["Poison"],stats:[46,57,40,40,40,50]},33:{name:"Nidorino",types:["Poison"],stats:[61,72,57,55,55,65]},34:{name:"Nidoking",types:["Poison","Ground"],stats:[81,102,77,85,75,85]},35:{name:"Clefairy",types:["Fairy"],stats:[70,45,48,60,65,35]},36:{name:"Clefable",types:["Fairy"],stats:[95,70,73,95,90,60]},37:{name:"Vulpix",types:["Fire"],stats:[38,41,40,50,65,65]},38:{name:"Ninetales",types:["Fire"],stats:[73,76,75,81,100,100]},39:{name:"Jigglypuff",types:["Normal","Fairy"],stats:[115,45,20,45,25,20]},40:{name:"Wigglytuff",types:["Normal","Fairy"],stats:[140,70,45,85,50,45]},41:{name:"Zubat",types:["Poison","Flying"],stats:[40,45,35,30,40,55]},42:{name:"Golbat",types:["Poison","Flying"],stats:[75,80,70,65,75,90]},43:{name:"Oddish",types:["Grass","Poison"],stats:[45,50,55,75,65,30]},44:{name:"Gloom",types:["Grass","Poison"],stats:[60,65,70,85,75,40]},45:{name:"Vileplume",types:["Grass","Poison"],stats:[75,80,85,110,90,50]},46:{name:"Paras",types:["Bug","Grass"],stats:[35,70,55,45,55,25]},47:{name:"Parasect",types:["Bug","Grass"],stats:[60,95,80,60,80,30]},48:{name:"Venonat",types:["Bug","Poison"],stats:[60,55,50,40,55,45]},49:{name:"Venomoth",types:["Bug","Poison"],stats:[70,65,60,90,75,90]},50:{name:"Diglett",types:["Ground"],stats:[10,55,25,35,45,95]},51:{name:"Dugtrio",types:["Ground"],stats:[35,100,50,50,70,120]},52:{name:"Meowth",types:["Normal"],stats:[40,45,35,40,40,90]},53:{name:"Persian",types:["Normal"],stats:[65,70,60,65,65,115]},54:{name:"Psyduck",types:["Water"],stats:[50,52,48,65,50,55]},55:{name:"Golduck",types:["Water"],stats:[80,82,78,95,80,85]},56:{name:"Mankey",types:["Fighting"],stats:[40,80,35,35,45,70]},57:{name:"Primeape",types:["Fighting"],stats:[65,105,60,60,70,95]},58:{name:"Growlithe",types:["Fire"],stats:[55,70,45,70,50,60]},59:{name:"Arcanine",types:["Fire"],stats:[90,110,80,100,80,95]},60:{name:"Poliwag",types:["Water"],stats:[40,50,40,40,40,90]},61:{name:"Poliwhirl",types:["Water"],stats:[65,65,65,50,50,90]},62:{name:"Poliwrath",types:["Water","Fighting"],stats:[90,95,95,70,90,70]},63:{name:"Abra",types:["Psychic"],stats:[25,20,15,105,55,90]},64:{name:"Kadabra",types:["Psychic"],stats:[40,35,30,120,70,105]},65:{name:"Alakazam",types:["Psychic"],stats:[55,50,45,135,95,120],mega:{stats:[55,50,65,175,105,150]}},66:{name:"Machop",types:["Fighting"],stats:[70,80,50,35,35,35]},67:{name:"Machoke",types:["Fighting"],stats:[80,100,70,50,60,45]},68:{name:"Machamp",types:["Fighting"],stats:[90,130,80,65,85,55]},69:{name:"Bellsprout",types:["Grass","Poison"],stats:[50,75,35,70,30,40]},70:{name:"Weepinbell",types:["Grass","Poison"],stats:[65,90,50,85,45,55]},71:{name:"Victreebel",types:["Grass","Poison"],stats:[80,105,65,100,70,70]},72:{name:"Tentacool",types:["Water","Poison"],stats:[40,40,35,50,100,70]},73:{name:"Tentacruel",types:["Water","Poison"],stats:[80,70,65,80,120,100]},74:{name:"Geodude",types:["Rock","Ground"],stats:[40,80,100,30,30,20]},75:{name:"Graveler",types:["Rock","Ground"],stats:[55,95,115,45,45,35]},76:{name:"Golem",types:["Rock","Ground"],stats:[80,120,130,55,65,45]},77:{name:"Ponyta",types:["Fire"],stats:[50,85,55,65,65,90]},78:{name:"Rapidash",types:["Fire"],stats:[65,100,70,80,80,105]},79:{name:"Slowpoke",types:["Water","Psychic"],stats:[90,65,65,40,40,15]},80:{name:"Slowbro",types:["Water","Psychic"],stats:[95,75,110,100,80,30]},81:{name:"Magnemite",types:["Electric","Steel"],stats:[25,35,70,95,55,45]},82:{name:"Magneton",types:["Electric","Steel"],stats:[50,60,95,120,70,70]},83:{name:"Farfetchd",types:["Normal","Flying"],stats:[52,90,55,58,62,60]},84:{name:"Doduo",types:["Normal","Flying"],stats:[35,85,45,35,35,75]},85:{name:"Dodrio",types:["Normal","Flying"],stats:[60,110,70,60,60,110]},86:{name:"Seel",types:["Water"],stats:[65,45,55,45,70,45]},87:{name:"Dewgong",types:["Water","Ice"],stats:[90,70,80,70,95,70]},88:{name:"Grimer",types:["Poison"],stats:[80,80,50,40,50,25]},89:{name:"Muk",types:["Poison"],stats:[105,105,75,65,100,50]},90:{name:"Shellder",types:["Water"],stats:[30,65,100,45,25,40]},91:{name:"Cloyster",types:["Water","Ice"],stats:[50,95,180,85,45,70]},92:{name:"Gastly",types:["Ghost","Poison"],stats:[30,35,30,100,35,80]},93:{name:"Haunter",types:["Ghost","Poison"],stats:[45,50,45,115,55,95]},94:{name:"Gengar",types:["Ghost","Poison"],stats:[60,65,60,130,75,110],mega:{stats:[60,65,80,170,95,130]}},95:{name:"Onix",types:["Rock","Ground"],stats:[35,45,160,30,45,70]},96:{name:"Drowzee",types:["Psychic"],stats:[60,48,45,43,90,42]},97:{name:"Hypno",types:["Psychic"],stats:[85,73,70,73,115,67]},98:{name:"Krabby",types:["Water"],stats:[30,105,90,25,25,50]},99:{name:"Kingler",types:["Water"],stats:[55,130,115,50,50,75]},100:{name:"Voltorb",types:["Electric"],stats:[40,30,50,55,55,100]},101:{name:"Electrode",types:["Electric"],stats:[60,50,70,80,80,150]},102:{name:"Exeggcute",types:["Grass","Psychic"],stats:[60,40,80,60,45,40]},103:{name:"Exeggutor",types:["Grass","Psychic"],stats:[95,95,85,125,75,55]},104:{name:"Cubone",types:["Ground"],stats:[50,50,95,40,50,35]},105:{name:"Marowak",types:["Ground"],stats:[60,80,110,50,80,45]},106:{name:"Hitmonlee",types:["Fighting"],stats:[50,120,53,35,110,87]},107:{name:"Hitmonchan",types:["Fighting"],stats:[50,105,79,35,110,76]},108:{name:"Lickitung",types:["Normal"],stats:[90,55,75,60,75,30]},109:{name:"Koffing",types:["Poison"],stats:[40,65,95,60,45,35]},110:{name:"Weezing",types:["Poison"],stats:[65,90,120,85,70,60]},111:{name:"Rhyhorn",types:["Ground","Rock"],stats:[80,85,95,30,30,25]},112:{name:"Rhydon",types:["Ground","Rock"],stats:[105,130,120,45,45,40]},113:{name:"Chansey",types:["Normal"],stats:[250,5,5,35,105,50]},114:{name:"Tangela",types:["Grass"],stats:[65,55,115,100,40,60]},115:{name:"Kangaskhan",types:["Normal"],stats:[105,95,80,40,80,90]},116:{name:"Horsea",types:["Water"],stats:[30,40,70,70,25,60]},117:{name:"Seadra",types:["Water"],stats:[55,65,95,95,45,85]},118:{name:"Goldeen",types:["Water"],stats:[45,67,60,35,50,63]},119:{name:"Seaking",types:["Water"],stats:[80,92,65,65,80,68]},120:{name:"Staryu",types:["Water"],stats:[30,45,55,70,55,85]},121:{name:"Starmie",types:["Water","Psychic"],stats:[60,75,85,100,85,115]},122:{name:"MrMime",types:["Psychic","Fairy"],stats:[40,45,65,100,120,90]},123:{name:"Scyther",types:["Bug","Flying"],stats:[70,110,80,55,80,105]},124:{name:"Jynx",types:["Ice","Psychic"],stats:[65,50,35,115,95,95]},125:{name:"Electabuzz",types:["Electric"],stats:[65,83,57,95,85,105]},126:{name:"Magmar",types:["Fire"],stats:[65,95,57,100,85,93]},127:{name:"Pinsir",types:["Bug"],stats:[65,125,100,55,70,85]},128:{name:"Tauros",types:["Normal"],stats:[75,100,95,40,70,110]},129:{name:"Magikarp",types:["Water"],stats:[20,10,55,15,20,80]},130:{name:"Gyarados",types:["Water","Flying"],stats:[95,125,79,60,100,81],mega:{stats:[95,155,109,70,130,81]}},131:{name:"Lapras",types:["Water","Ice"],stats:[130,85,80,85,95,60]},132:{name:"Ditto",types:["Normal"],stats:[48,48,48,48,48,48]},133:{name:"Eevee",types:["Normal"],stats:[55,55,50,45,65,55]},134:{name:"Vaporeon",types:["Water"],stats:[130,65,60,110,95,65]},135:{name:"Jolteon",types:["Electric"],stats:[65,65,60,110,95,130]},136:{name:"Flareon",types:["Fire"],stats:[65,130,60,95,110,65]},137:{name:"Porygon",types:["Normal"],stats:[65,60,70,85,75,40]},138:{name:"Omanyte",types:["Rock","Water"],stats:[35,40,100,90,55,35]},139:{name:"Omastar",types:["Rock","Water"],stats:[70,60,125,115,70,55]},140:{name:"Kabuto",types:["Rock","Water"],stats:[30,80,90,55,45,55]},141:{name:"Kabutops",types:["Rock","Water"],stats:[60,115,105,65,70,80]},142:{name:"Aerodactyl",types:["Rock","Flying"],stats:[80,105,65,60,75,130]},143:{name:"Snorlax",types:["Normal"],stats:[160,110,65,65,110,30]},144:{name:"Articuno",types:["Ice","Flying"],stats:[90,85,100,95,125,85]},145:{name:"Zapdos",types:["Electric","Flying"],stats:[90,90,85,125,90,100]},146:{name:"Moltres",types:["Fire","Flying"],stats:[90,100,90,125,85,90]},147:{name:"Dratini",types:["Dragon"],stats:[41,64,45,50,50,50]},148:{name:"Dragonair",types:["Dragon"],stats:[61,84,65,70,70,70]},149:{name:"Dragonite",types:["Dragon","Flying"],stats:[91,134,95,100,100,80]},150:{name:"Mewtwo",types:["Psychic"],stats:[106,110,90,154,90,130],mega:{stats:[106,190,100,154,100,130]}},151:{name:"Mew",types:["Psychic"],stats:[100,100,100,100,100,100]},152:{name:"Chikorita",types:["Grass"],stats:[45,49,65,49,65,45]},155:{name:"Cyndaquil",types:["Fire"],stats:[39,52,43,60,50,65]},158:{name:"Totodile",types:["Water"],stats:[50,65,64,44,48,43]},179:{name:"Mareep",types:["Electric"],stats:[55,40,40,65,45,35]},196:{name:"Espeon",types:["Psychic"],stats:[65,65,60,130,95,110]},197:{name:"Umbreon",types:["Dark"],stats:[95,65,110,60,130,65]},198:{name:"Murkrow",types:["Dark","Flying"],stats:[60,85,42,85,42,91]},212:{name:"Scizor",types:["Bug","Steel"],stats:[70,130,100,55,80,65],mega:{stats:[70,150,140,65,100,75]}},214:{name:"Heracross",types:["Bug","Fighting"],stats:[80,125,75,40,95,85],mega:{stats:[80,185,115,40,105,75]}},227:{name:"Skarmory",types:["Steel","Flying"],stats:[65,80,140,40,70,70]},228:{name:"Houndour",types:["Dark","Fire"],stats:[45,60,30,80,50,65]},229:{name:"Houndoom",types:["Dark","Fire"],stats:[75,90,50,110,80,95]},243:{name:"Raikou",types:["Electric"],stats:[90,85,75,115,100,115]},244:{name:"Entei",types:["Fire"],stats:[115,115,85,90,75,100]},245:{name:"Suicune",types:["Water"],stats:[100,75,115,90,115,85]},248:{name:"Tyranitar",types:["Rock","Dark"],stats:[100,134,110,95,100,61],mega:{stats:[100,164,150,95,120,71]}},249:{name:"Lugia",types:["Psychic","Flying"],stats:[106,90,130,90,154,110]},250:{name:"Ho-Oh",types:["Fire","Flying"],stats:[106,130,90,110,154,90]},251:{name:"Celebi",types:["Psychic","Grass"],stats:[100,100,100,100,100,100]},252:{name:"Treecko",types:["Grass"],stats:[40,45,35,65,55,70]},255:{name:"Torchic",types:["Fire"],stats:[45,60,40,70,50,45]},257:{name:"Blaziken",types:["Fire","Fighting"],stats:[80,120,70,110,70,80],mega:{stats:[80,160,80,130,80,100]}},258:{name:"Mudkip",types:["Water"],stats:[50,70,50,50,50,40]},260:{name:"Swampert",types:["Water","Ground"],stats:[100,110,90,85,90,60]},282:{name:"Gardevoir",types:["Psychic","Fairy"],stats:[68,65,65,125,115,80],mega:{stats:[68,85,65,165,135,100]}},359:{name:"Absol",types:["Dark"],stats:[65,130,60,75,60,75],mega:{stats:[65,150,60,115,60,115]}},373:{name:"Salamence",types:["Dragon","Flying"],stats:[95,135,80,110,80,100],mega:{stats:[95,145,130,120,90,120]}},376:{name:"Metagross",types:["Steel","Psychic"],stats:[80,135,130,95,90,70],mega:{stats:[80,145,150,105,110,110]}},380:{name:"Latias",types:["Dragon","Psychic"],stats:[80,80,90,110,130,110]},381:{name:"Latios",types:["Dragon","Psychic"],stats:[80,90,80,130,110,110]},384:{name:"Rayquaza",types:["Dragon","Flying"],stats:[105,150,90,150,90,95],mega:{stats:[105,180,100,180,100,115]}},445:{name:"Garchomp",types:["Dragon","Ground"],stats:[108,130,95,80,85,102],mega:{stats:[108,170,115,120,95,92]}},448:{name:"Lucario",types:["Fighting","Steel"],stats:[70,110,70,115,70,90],mega:{stats:[70,145,88,140,70,112]}},460:{name:"Abomasnow",types:["Grass","Ice"],stats:[90,92,75,92,85,60],mega:{stats:[90,132,105,132,105,30]}},475:{name:"Gallade",types:["Psychic","Fighting"],stats:[68,125,65,65,115,80],mega:{stats:[68,165,95,65,115,110]}},428:{name:"Lopunny",types:["Normal"],stats:[65,76,84,54,96,105],mega:{stats:[65,136,94,54,96,135]}}
+};
+Object.keys(DEX).forEach(id=>{ if(!DEX[id].moves) DEX[id].moves = ["Tackle","Quick Attack","Body Slam","Hyper Beam"]; });
+
+const EVOLUTIONS = {1:{level:16,to:2},2:{level:32,to:3},4:{level:16,to:5},5:{level:36,to:6},7:{level:16,to:8},8:{level:36,to:9},10:{level:7,to:11},11:{level:10,to:12},13:{level:7,to:14},14:{level:10,to:15},16:{level:18,to:17},17:{level:36,to:18},19:{level:20,to:20},21:{level:20,to:22},23:{level:22,to:24},25:{level:30,to:26},27:{level:22,to:28},29:{level:16,to:30},30:{level:32,to:31},32:{level:16,to:33},33:{level:32,to:34},35:{level:30,to:36},37:{level:30,to:38},39:{level:30,to:40},41:{level:22,to:42},43:{level:21,to:44},44:{level:32,to:45},46:{level:24,to:47},48:{level:31,to:49},50:{level:26,to:51},52:{level:28,to:53},54:{level:33,to:55},56:{level:28,to:57},58:{level:30,to:59},60:{level:25,to:61},61:{level:36,to:62},63:{level:16,to:64},64:{level:36,to:65},66:{level:28,to:67},67:{level:42,to:68},69:{level:21,to:70},70:{level:32,to:71},72:{level:30,to:73},74:{level:25,to:75},75:{level:40,to:76},77:{level:40,to:78},79:{level:37,to:80},81:{level:30,to:82},84:{level:31,to:85},86:{level:34,to:87},88:{level:38,to:89},90:{level:35,to:91},92:{level:25,to:93},93:{level:40,to:94},96:{level:26,to:97},98:{level:28,to:99},100:{level:30,to:101},102:{level:35,to:103},104:{level:28,to:105},109:{level:35,to:110},111:{level:42,to:112},116:{level:32,to:117},118:{level:33,to:119},120:{level:35,to:121},129:{level:20,to:130},133:{level:25,to:134},138:{level:40,to:139},140:{level:40,to:141},147:{level:30,to:148},148:{level:55,to:149},152:{level:16,to:153},155:{level:14,to:156},158:{level:18,to:159},179:{level:15,to:180},228:{level:24,to:229},252:{level:16,to:253},255:{level:16,to:256},256:{level:36,to:257},258:{level:16,to:259},259:{level:36,to:260}};
+
+const MEGA_STONES = {3:"Venusaurita",6:"Charizardita X",9:"Blastoiseita",65:"Alakazamita",94:"Gengarita",130:"Gyaradosita",150:"Mewtwoita",257:"Blazikenita",282:"Gardevoirita",359:"Absolita",373:"Salamencita",376:"Metagrossita",384:"Rayquazaita",445:"Garchompita",448:"Lucarioita",460:"Abomasnowita",212:"Scizorita",248:"Tyranitarita",214:"Heracrossita",475:"Galladita",428:"Lopunnita"};
+
+function getMovesForLevel(id, level){
+  const d = DEX[id]; const t1 = d.types[0], t2 = d.types[1];
+  const baseMoves = {Normal:[["Tackle",1],["Quick Attack",5],["Body Slam",20],["Hyper Beam",40]],Fire:[["Scratch",1],["Ember",8],["Flamethrower",25],["Fire Blast",40]],Water:[["Tackle",1],["Water Gun",8],["Surf",25],["Hydro Pump",40]],Grass:[["Tackle",1],["Vine Whip",8],["Razor Leaf",25],["Solar Beam",40]],Electric:[["Thunder Shock",1],["Thunder Wave",10],["Thunderbolt",25],["Thunder",40]],Ice:[["Tackle",1],["Ice Beam",15],["Blizzard",35],["Ice Punch",25]],Psychic:[["Tackle",1],["Psybeam",10],["Psychic",30],["Psystrike",45]],Ghost:[["Lick",1],["Shadow Ball",15],["Shadow Claw",25],["Dark Pulse",35]],Ground:[["Tackle",1],["Dig",12],["Earthquake",30],["Rock Slide",25]],Rock:[["Tackle",1],["Rock Slide",15],["Stone Edge",30],["Earthquake",25]],Dragon:[["Tackle",1],["Dragon Pulse",15],["Dragon Claw",25],["Outrage",40]],Flying:[["Peck",1],["Wing Attack",10],["Air Slash",25],["Brave Bird",40]],Poison:[["Poison Sting",1],["Poison Jab",15],["Sludge Bomb",28],["Toxic",20]],Fighting:[["Karate Chop",1],["Brick Break",15],["Close Combat",30],["Aura Sphere",25]],Steel:[["Tackle",1],["Flash Cannon",15],["Iron Tail",25],["Meteor Mash",35]],Bug:[["Bug Bite",1],["X-Scissor",20],["Bug Buzz",30],["Swords Dance",25]],Fairy:[["Tackle",1],["Dazzling Gleam",15],["Moonblast",28],["Calm Mind",25]],Dark:[["Bite",1],["Crunch",18],["Dark Pulse",28],["Swords Dance",25]]};
+  const pool = new Set();
+  [t1,t2].filter(Boolean).forEach(t=>{ (baseMoves[t]||baseMoves.Normal).forEach(([m,lv])=>{ if(level>=lv) pool.add(m); }); });
+  const arr = Array.from(pool); if(arr.length === 0) return ["Tackle"]; return arr.slice(-4);
+}
+function getMoveLearnedAt(id, level){
+  const d = DEX[id]; const t1 = d.types[0], t2 = d.types[1];
+  const baseMoves = {Normal:[[1,"Tackle"],[5,"Quick Attack"],[20,"Body Slam"],[40,"Hyper Beam"]],Fire:[[1,"Scratch"],[8,"Ember"],[25,"Flamethrower"],[40,"Fire Blast"]],Water:[[1,"Tackle"],[8,"Water Gun"],[25,"Surf"],[40,"Hydro Pump"]],Grass:[[1,"Tackle"],[8,"Vine Whip"],[25,"Razor Leaf"],[40,"Solar Beam"]],Electric:[[1,"Thunder Shock"],[10,"Thunder Wave"],[25,"Thunderbolt"],[40,"Thunder"]],Ice:[[1,"Tackle"],[15,"Ice Beam"],[35,"Blizzard"],[25,"Ice Punch"]],Psychic:[[1,"Tackle"],[10,"Psybeam"],[30,"Psychic"],[45,"Psystrike"]],Ghost:[[1,"Lick"],[15,"Shadow Ball"],[25,"Shadow Claw"],[35,"Dark Pulse"]],Ground:[[1,"Tackle"],[12,"Dig"],[30,"Earthquake"],[25,"Rock Slide"]],Rock:[[1,"Tackle"],[15,"Rock Slide"],[30,"Stone Edge"],[25,"Earthquake"]],Dragon:[[1,"Tackle"],[15,"Dragon Pulse"],[25,"Dragon Claw"],[40,"Outrage"]],Flying:[[1,"Peck"],[10,"Wing Attack"],[25,"Air Slash"],[40,"Brave Bird"]],Poison:[[1,"Poison Sting"],[15,"Poison Jab"],[28,"Sludge Bomb"],[20,"Toxic"]],Fighting:[[1,"Karate Chop"],[15,"Brick Break"],[30,"Close Combat"],[25,"Aura Sphere"]],Steel:[[1,"Tackle"],[15,"Flash Cannon"],[25,"Iron Tail"],[35,"Meteor Mash"]],Bug:[[1,"Bug Bite"],[20,"X-Scissor"],[30,"Bug Buzz"],[25,"Swords Dance"]],Fairy:[[1,"Tackle"],[15,"Dazzling Gleam"],[28,"Moonblast"],[25,"Calm Mind"]],Dark:[[1,"Bite"],[18,"Crunch"],[28,"Dark Pulse"],[25,"Swords Dance"]]};
+  const seen = new Set(), found = [];
+  [t1,t2].filter(Boolean).forEach(t=>{ (baseMoves[t]||baseMoves.Normal).forEach(([lv,m])=>{ if(lv === level && !seen.has(m)){ seen.add(m); found.push(m); } }); });
+  return found[0] || null;
+}
+
+const GYMS = [
+{id:1,name:"Brock",type:"Rock",team:[{id:74,lv:12},{id:95,lv:14}],megaStone:null,badge:"Medalla Roca"},
+{id:2,name:"Misty",type:"Water",team:[{id:120,lv:18},{id:121,lv:20}],megaStone:null,badge:"Medalla Cascada"},
+{id:3,name:"Lt. Surge",type:"Electric",team:[{id:100,lv:22},{id:25,lv:24},{id:26,lv:26}],megaStone:null,badge:"Medalla Trueno"},
+{id:4,name:"Erika",type:"Grass",team:[{id:71,lv:28},{id:45,lv:30},{id:3,lv:33}],megaStone:"Venusaurita",badge:"Medalla Arcoiris"},
+{id:5,name:"Koga",type:"Poison",team:[{id:89,lv:34},{id:110,lv:36},{id:94,lv:38}],megaStone:"Gengarita",badge:"Medalla Alma"},
+{id:6,name:"Sabrina",type:"Psychic",team:[{id:64,lv:40},{id:65,lv:43},{id:150,lv:45}],megaStone:"Alakazamita",badge:"Medalla Pantano"},
+{id:7,name:"Blaine",type:"Fire",team:[{id:59,lv:44},{id:136,lv:46},{id:6,lv:48}],megaStone:"Charizardita X",badge:"Medalla Volcán"},
+{id:8,name:"Giovanni",type:"Ground",team:[{id:112,lv:48},{id:51,lv:50},{id:445,lv:52}],megaStone:"Garchompita",badge:"Medalla Tierra"},
+{id:9,name:"Falkner",type:"Flying",team:[{id:18,lv:52},{id:22,lv:54}],megaStone:null,badge:"Medalla Céfiro"},
+{id:10,name:"Bugsy",type:"Bug",team:[{id:123,lv:56},{id:212,lv:58}],megaStone:"Scizorita",badge:"Medalla Colmena"},
+{id:11,name:"Whitney",type:"Normal",team:[{id:143,lv:60},{id:428,lv:62}],megaStone:"Lopunnita",badge:"Medalla Planicie"},
+{id:12,name:"Morty",type:"Ghost",team:[{id:94,lv:64},{id:94,lv:66}],megaStone:null,badge:"Medalla Niebla"},
+{id:13,name:"Chuck",type:"Fighting",team:[{id:68,lv:68},{id:214,lv:70}],megaStone:"Heracrossita",badge:"Medalla Tormenta"},
+{id:14,name:"Jasmine",type:"Steel",team:[{id:376,lv:72},{id:212,lv:74}],megaStone:"Metagrossita",badge:"Medalla Mineral"},
+{id:15,name:"Pryce",type:"Ice",team:[{id:131,lv:76},{id:460,lv:78}],megaStone:"Abomasnowita",badge:"Medalla Glaciar"},
+{id:16,name:"Clair",type:"Dragon",team:[{id:149,lv:80},{id:373,lv:82},{id:384,lv:85}],megaStone:"Rayquazaita",badge:"Medalla Dragón"}
+];
+
+function routeZone(name,minLv,maxLv,orientation="vertical"){ const isV = orientation === "vertical"; const size = isV ? {w:100,h:220} : {w:220,h:100}; const grass = isV ? [{x:-32,z:0,w:36,h:180,min:minLv,max:maxLv},{x:32,z:0,w:36,h:180,min:minLv,max:maxLv}] : [{x:0,z:-32,w:180,h:36,min:minLv,max:maxLv},{x:0,z:32,w:180,h:36,min:minLv,max:maxLv}]; return {name,type:"route",size,grass,orientation,exits:{}}; }
+function cityZone(name,gymId){ return {name,type:"city",size:{w:200,h:200},gymId,hasCenter:true,hasMart:true,exits:{},houses:[{x:-60,z:-30,color:0xf5e6c8},{x:60,z:-30,color:0xd8e5f5},{x:0,z:60,color:0xe8d5c0},{x:-70,z:60,color:0xe0d0b8}]}; }
+function townZone(name,extras={}){ return {name,type:"town",size:{w:180,h:180},exits:{},houses:[{x:-50,z:-30,color:0xf5e6c8},{x:50,z:-30,color:0xd8e5f5}],...extras}; }
+
+const ZONES = {
+pueblo_inicio: townZone("Pueblo Inicio",{hasAirport:true,npcs:[{x:-20,z:20,name:"Profesor Oak",color:0xffffff,action:"starter",opts:{cap:0x333333,hair:0x888888}},{x:15,z:30,name:"Rival May",color:0xdd3377,text:"¡Nos veremos al final!",opts:{hair:0x5a3a1a,cap:0xff6699}},{x:30,z:-30,name:"Chica",color:0xffbbdd,text:"Camina al norte para empezar.",opts:{hair:0x8b4513}}]}),
+ruta_1: routeZone("Ruta 1",3,6),
+ciudad_plateada: cityZone("Ciudad Plateada",1),
+ruta_2: routeZone("Ruta 2",5,8,"horizontal"),
+ciudad_celeste: cityZone("Ciudad Celeste",2),
+ruta_3: routeZone("Ruta 3",8,11),
+ciudad_carmin: cityZone("Ciudad Carmín",3),
+ruta_4: routeZone("Ruta 4",11,14,"horizontal"),
+ciudad_azulona: cityZone("Ciudad Azulona",4),
+ruta_5: routeZone("Ruta 5",14,18),
+ciudad_fucsia: cityZone("Ciudad Fucsia",5),
+ruta_6: routeZone("Ruta 6",17,20,"horizontal"),
+ciudad_azafran: cityZone("Ciudad Azafrán",6),
+ruta_7: routeZone("Ruta 7",20,24),
+isla_canela: cityZone("Isla Canela",7),
+ruta_8: routeZone("Ruta 8",23,27,"horizontal"),
+ciudad_verde: cityZone("Ciudad Verde",8),
+ruta_9: routeZone("Ruta 9",27,32),
+liga_kanto: {name:"Liga Kanto Nova",type:"league",size:{w:180,h:180},exits:{},npcs:[{x:0,z:-40,name:"Campeón R1",color:0xff00ff,action:"championR1",opts:{cap:0x8b00ff,hair:0x111111}}]},
+pueblo_boreal: townZone("Pueblo Boreal",{hasAirport:true,npcs:[{x:-20,z:20,name:"Profesor Aurelio",color:0x9966cc,text:"¡Bienvenido a Aurelia!",opts:{cap:0x4a2a8a,hair:0xeeeeee}},{x:15,z:30,name:"Rival Aura",color:0x00cccc,text:"¡Yo seré tu rival!",opts:{hair:0x00aaaa,cap:0x006666}}]}),
+ruta_a: routeZone("Ruta A",33,37),
+ciudad_malva: cityZone("Ciudad Malva",9),
+ruta_b: routeZone("Ruta B",36,40,"horizontal"),
+pueblo_azalea: cityZone("Pueblo Azalea",10),
+ruta_c: routeZone("Ruta C",40,44),
+ciudad_trigal: cityZone("Ciudad Trigal",11),
+ruta_d: routeZone("Ruta D",43,48,"horizontal"),
+ciudad_iris: cityZone("Ciudad Iris",12),
+ruta_e: routeZone("Ruta E",47,52),
+ciudad_orquidea: cityZone("Ciudad Orquídea",13),
+ruta_f: routeZone("Ruta F",51,55,"horizontal"),
+ciudad_olivo: cityZone("Ciudad Olivo",14),
+ruta_g: routeZone("Ruta G",54,59),
+ciudad_caoba: cityZone("Ciudad Caoba",15),
+ruta_h: routeZone("Ruta H",58,63,"horizontal"),
+ciudad_endrino: cityZone("Ciudad Endrino",16),
+ruta_i: routeZone("Ruta I",62,68),
+liga_aurelia: {name:"Liga Aurelia",type:"league",size:{w:180,h:180},exits:{},npcs:[{x:0,z:-40,name:"Campeón R2",color:0x00ccff,action:"championR2",opts:{cap:0x0088cc,hair:0xffdd66}}]}
+};
+
+function link(a,dir,b){ ZONES[a].exits[dir] = {to:b}; }
+link("pueblo_inicio","north","ruta_1");link("ruta_1","south","pueblo_inicio");link("ruta_1","north","ciudad_plateada");
+link("ciudad_plateada","south","ruta_1");link("ciudad_plateada","east","ruta_2");
+link("ruta_2","west","ciudad_plateada");link("ruta_2","east","ciudad_celeste");
+link("ciudad_celeste","west","ruta_2");link("ciudad_celeste","north","ruta_3");
+link("ruta_3","south","ciudad_celeste");link("ruta_3","north","ciudad_carmin");
+link("ciudad_carmin","south","ruta_3");link("ciudad_carmin","east","ruta_4");
+link("ruta_4","west","ciudad_carmin");link("ruta_4","east","ciudad_azulona");
+link("ciudad_azulona","west","ruta_4");link("ciudad_azulona","south","ruta_5");
+link("ruta_5","north","ciudad_azulona");link("ruta_5","south","ciudad_fucsia");
+link("ciudad_fucsia","north","ruta_5");link("ciudad_fucsia","east","ruta_6");
+link("ruta_6","west","ciudad_fucsia");link("ruta_6","east","ciudad_azafran");
+link("ciudad_azafran","west","ruta_6");link("ciudad_azafran","south","ruta_7");
+link("ruta_7","north","ciudad_azafran");link("ruta_7","south","isla_canela");
+link("isla_canela","north","ruta_7");link("isla_canela","west","ruta_8");
+link("ruta_8","east","isla_canela");link("ruta_8","west","ciudad_verde");
+link("ciudad_verde","east","ruta_8");link("ciudad_verde","north","ruta_9");
+link("ruta_9","south","ciudad_verde");link("ruta_9","north","liga_kanto");link("liga_kanto","south","ruta_9");
+link("pueblo_boreal","north","ruta_a");link("ruta_a","south","pueblo_boreal");link("ruta_a","north","ciudad_malva");
+link("ciudad_malva","south","ruta_a");link("ciudad_malva","east","ruta_b");
+link("ruta_b","west","ciudad_malva");link("ruta_b","east","pueblo_azalea");
+link("pueblo_azalea","west","ruta_b");link("pueblo_azalea","north","ruta_c");
+link("ruta_c","south","pueblo_azalea");link("ruta_c","north","ciudad_trigal");
+link("ciudad_trigal","south","ruta_c");link("ciudad_trigal","east","ruta_d");
+link("ruta_d","west","ciudad_trigal");link("ruta_d","east","ciudad_iris");
+link("ciudad_iris","west","ruta_d");link("ciudad_iris","south","ruta_e");
+link("ruta_e","north","ciudad_iris");link("ruta_e","south","ciudad_orquidea");
+link("ciudad_orquidea","north","ruta_e");link("ciudad_orquidea","east","ruta_f");
+link("ruta_f","west","ciudad_orquidea");link("ruta_f","east","ciudad_olivo");
+link("ciudad_olivo","west","ruta_f");link("ciudad_olivo","south","ruta_g");
+link("ruta_g","north","ciudad_olivo");link("ruta_g","south","ciudad_caoba");
+link("ciudad_caoba","north","ruta_g");link("ciudad_caoba","east","ruta_h");
+link("ruta_h","west","ciudad_caoba");link("ruta_h","east","ciudad_endrino");
+link("ciudad_endrino","west","ruta_h");link("ciudad_endrino","north","ruta_i");
+link("ruta_i","south","ciudad_endrino");link("ruta_i","north","liga_aurelia");link("liga_aurelia","south","ruta_i");
+
+const game = {
+state:"title",
+player:{name:"Brendan",party:[],box:[],badges:0,money:3000,megaStones:[],potions:5,balls:50,greatBalls:0,ultraBalls:0,masterBalls:0,superPotions:0,hyperPotions:0,revives:0,fireStones:0,waterStones:0,thunderStones:0,leafStones:0,region:1,defeated:new Set(),caught:new Set(),seen:new Set(),tms:[],reward10:false,reward50:false,reward100:false},
+flags:{starter:false,championR1:false,championR2:false,planeUnlocked:false},
+keys:{},overworldPaused:false,inInterior:false
+};
+
+function xpForLevel(lv){ return Math.floor(4 * Math.pow(lv,3) / 5); }
+
+class Pokemon {
+  constructor(id, level){
+    const d = DEX[id];
+    this.dexId=id; this.species=d.name; this.types=d.types.slice();
+    this.level=level; this.xp=0;
+    this.isShiny = false;
+    this.stats = this.calcStats(d.stats);
+    this.maxHp = this.stats[0]; this.hp = this.maxHp;
+    this.moves = getMovesForLevel(id,level);
+    this.movePP = this.moves.map(()=>20);
+    this.mega=false; this.megaData=d.mega||null;
+    this.status=null; this.statusTurns=0;
+    this.statStages={atk:0,def:0,spa:0,spd:0,spe:0};
+  }
+  calcStats(base){ const L=this.level; return [Math.floor((2*base[0]*L)/100)+L+10,Math.floor((2*base[1]*L)/100)+5,Math.floor((2*base[2]*L)/100)+5,Math.floor((2*base[3]*L)/100)+5,Math.floor((2*base[4]*L)/100)+5,Math.floor((2*base[5]*L)/100)+5]; }
+  megaEvolve(){ if(!this.megaData||this.mega) return false; this.mega=true; this.stats=this.calcStats(this.megaData.stats); const r=this.hp/this.maxHp; this.maxHp=this.stats[0]; this.hp=Math.floor(this.maxHp*r); if(this.dexId===6) this.types=["Fire","Dragon"]; if(this.dexId===282) this.types=["Psychic","Fairy"]; return true; }
+  heal(){ this.hp=this.maxHp; this.status=null; this.movePP=this.moves.map(()=>20); }
+  gainXP(amount){
+    this.xp += amount; const events = [];
+    while(this.xp >= xpForLevel(this.level+1) && this.level < 100){
+      this.xp -= xpForLevel(this.level+1); this.level++;
+      const ratio = this.hp/this.maxHp;
+      this.stats = this.calcStats(DEX[this.dexId].stats);
+      this.maxHp = this.stats[0]; this.hp = Math.max(1,Math.floor(this.maxHp*ratio));
+      events.push({type:"levelup",level:this.level});
+      const newMove = getMoveLearnedAt(this.dexId,this.level);
+      if(newMove && !this.moves.includes(newMove)){
+        if(this.moves.length >= 4){ const forgotten = this.moves.shift(); this.movePP.shift(); events.push({type:"forgot",move:forgotten}); }
+        this.moves.push(newMove); this.movePP.push(20); events.push({type:"move",move:newMove});
+      }
+      const evo = EVOLUTIONS[this.dexId];
+      if(evo && this.level >= evo.level && !this.pendingEvolution){ this.pendingEvolution = evo.to; events.push({type:"evolution",to:evo.to}); }
+    }
+    return events;
+  }
+}
+
+let scene,camera,renderer,player,clock;
+let currentZoneGroup=null,currentZoneId=null,currentZoneData=null;
+let transitioning=false,transitionCooldown=0;
+let colliders=[],NPCs=[],gymMeshes=[],grassPatches=[],marts=[],centers=[],airports=[];
+let overworldPokemon = [];
+let followingMon = null;
+let camYaw=0,camPitch=0.35,camDist=9;
+let touchMove={x:0,y:0};
+let isMobile=false;
+let sunLight=null,hemiLight=null;
+let dayCycleTime=0.3;
+let skyDome=null,sunMesh=null,moonMesh=null,starField=null,cloudGroup=null;
+let fireflies=null,leaves=null,waterMeshes=[];
+
+function initThree(){
+  scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x9fd5f0,120,320);
+  camera = new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,1200);
+  renderer = new THREE.WebGLRenderer({antialias:!isMobile,powerPreference:"high-performance"});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,isMobile?1.5:2));
+  renderer.setSize(innerWidth,innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = isMobile?THREE.PCFShadowMap:THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.15;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  document.body.insertBefore(renderer.domElement,document.body.firstChild);
+  hemiLight = new THREE.HemisphereLight(0xbfe3ff,0x4a6b3a,0.85); scene.add(hemiLight);
+  sunLight = new THREE.DirectionalLight(0xfff0c8,1.35);
+  sunLight.position.set(80,160,60);
+  sunLight.castShadow = true;
+  const ss = isMobile?1024:2048;
+  sunLight.shadow.mapSize.set(ss,ss);
+  sunLight.shadow.bias = -0.0005;
+  const d = isMobile?180:250;
+  sunLight.shadow.camera.left=-d; sunLight.shadow.camera.right=d;
+  sunLight.shadow.camera.top=d; sunLight.shadow.camera.bottom=-d;
+  sunLight.shadow.camera.far = 600;
+  scene.add(sunLight);
+  createSkySystem();
+  createFireflies();
+  createLeaves();
+  clock = new THREE.Clock();
+  window.addEventListener("resize",()=>{ camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+}
+
+function createSkySystem(){
+  const skyGeo = new THREE.SphereGeometry(500,32,16);
+  const skyMat = new THREE.ShaderMaterial({
+    uniforms:{topColor:{value:new THREE.Color(0x0077ff)},bottomColor:{value:new THREE.Color(0xaaddff)},offset:{value:20},exponent:{value:0.7}},
+    vertexShader:`varying vec3 vWorldPosition; void main(){ vec4 worldPos = modelMatrix * vec4(position,1.0); vWorldPosition = worldPos.xyz; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader:`uniform vec3 topColor; uniform vec3 bottomColor; uniform float offset; uniform float exponent; varying vec3 vWorldPosition; void main(){ float h = normalize(vWorldPosition + offset).y; gl_FragColor = vec4(mix(bottomColor,topColor,max(pow(max(h,0.0),exponent),0.0)),1.0); }`,
+    side:THREE.BackSide
+  });
+  skyDome = new THREE.Mesh(skyGeo,skyMat);
+  scene.add(skyDome);
+  sunMesh = new THREE.Mesh(new THREE.SphereGeometry(15,24,24),new THREE.MeshBasicMaterial({color:0xffffaa}));
+  scene.add(sunMesh);
+  moonMesh = new THREE.Mesh(new THREE.SphereGeometry(10,20,20),new THREE.MeshBasicMaterial({color:0xddddff}));
+  scene.add(moonMesh);
+  const starGeo = new THREE.BufferGeometry();
+  const starPositions = [];
+  for(let i=0;i<1000;i++){
+    const theta = Math.random()*Math.PI*2;
+    const phi = Math.random()*Math.PI*0.5;
+    const r = 480;
+    starPositions.push(r*Math.sin(phi)*Math.cos(theta),r*Math.cos(phi),r*Math.sin(phi)*Math.sin(theta));
+  }
+  starGeo.setAttribute('position',new THREE.Float32BufferAttribute(starPositions,3));
+  starField = new THREE.Points(starGeo,new THREE.PointsMaterial({color:0xffffff,size:1.8,transparent:true,opacity:0}));
+  scene.add(starField);
+  cloudGroup = new THREE.Group();
+  for(let i=0;i<25;i++){
+    const cloud = new THREE.Group();
+    const puffCount = 3 + Math.floor(Math.random()*3);
+    for(let j=0;j<puffCount;j++){
+      const puff = new THREE.Mesh(new THREE.SphereGeometry(5+Math.random()*5,8,8),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.7}));
+      puff.position.set(j*5-puffCount*2.5,Math.random()*3,Math.random()*4-2);
+      cloud.add(puff);
+    }
+    cloud.position.set((Math.random()-0.5)*500,90+Math.random()*50,(Math.random()-0.5)*500);
+    cloud.userData.speed = 0.8 + Math.random()*1.5;
+    cloudGroup.add(cloud);
+  }
+  scene.add(cloudGroup);
+}
+
+function updateSkySystem(dt){
+  if(!skyDome) return;
+  const angle = dayCycleTime * Math.PI * 2 - Math.PI/2;
+  const sunY = Math.sin(angle)*250;
+  const sunX = Math.cos(angle)*250;
+  sunMesh.position.set(sunX,sunY,0);
+  moonMesh.position.set(-sunX,-sunY,0);
+  const isDay = sunY > 30;
+  const isDusk = sunY > -30 && sunY < 30;
+  const isNight = sunY < -30;
+  if(isDay){
+    skyDome.material.uniforms.topColor.value.setHex(0x0077ff);
+    skyDome.material.uniforms.bottomColor.value.setHex(0xaaddff);
+    scene.fog.color.setHex(0x9fd5f0);
+  } else if(isDusk){
+    const t = (sunY + 30) / 60;
+    const topC = new THREE.Color().lerpColors(new THREE.Color(0x1a0a3a),new THREE.Color(0x0077ff),t);
+    const botC = new THREE.Color().lerpColors(new THREE.Color(0xff6633),new THREE.Color(0xaaddff),t);
+    skyDome.material.uniforms.topColor.value.copy(topC);
+    skyDome.material.uniforms.bottomColor.value.copy(botC);
+    scene.fog.color.setHex(0xff9966);
+  } else {
+    skyDome.material.uniforms.topColor.value.setHex(0x000011);
+    skyDome.material.uniforms.bottomColor.value.setHex(0x0a0a2a);
+    scene.fog.color.setHex(0x0a1030);
+  }
+  starField.material.opacity = isNight?1.0:(isDusk?0.3:0);
+  cloudGroup.children.forEach(c=>{
+    c.position.x += c.userData.speed*dt;
+    if(c.position.x > 250) c.position.x = -250;
+  });
+  skyDome.position.copy(camera.position);
+  skyDome.position.y = 0;
+  sunMesh.position.add(camera.position.clone().setY(0));
+  moonMesh.position.add(camera.position.clone().setY(0));
+  starField.position.copy(camera.position.clone().setY(0));
+}
+
+function createFireflies(){
+  const geo = new THREE.BufferGeometry();
+  const positions = [];
+  const colors = [];
+  for(let i=0;i<150;i++){
+    positions.push((Math.random()-0.5)*80,1+Math.random()*8,(Math.random()-0.5)*80);
+    colors.push(1,1,0.4);
+  }
+  geo.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  geo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
+  fireflies = new THREE.Points(geo,new THREE.PointsMaterial({size:0.4,vertexColors:true,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}));
+  scene.add(fireflies);
+}
+
+function createLeaves(){
+  const geo = new THREE.BufferGeometry();
+  const positions = [];
+  for(let i=0;i<80;i++) positions.push((Math.random()-0.5)*60,Math.random()*20,(Math.random()-0.5)*60);
+  geo.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  leaves = new THREE.Points(geo,new THREE.PointsMaterial({size:0.45,color:0xff9944,transparent:true,opacity:0.55,depthWrite:false}));
+  scene.add(leaves);
+}
+
+function updateParticles(dt){
+  if(fireflies){
+    const night = dayCycleTime > 0.7 || dayCycleTime < 0.2;
+    fireflies.material.opacity += ((night?0.9:0)-fireflies.material.opacity)*Math.min(1,dt*2);
+    if(night){
+      const pos = fireflies.geometry.attributes.position;
+      for(let i=0;i<pos.count;i++){
+        pos.setX(i,pos.getX(i)+Math.sin(performance.now()*0.001+i)*dt*0.3);
+        pos.setY(i,pos.getY(i)+Math.cos(performance.now()*0.0013+i)*dt*0.2);
+        pos.setZ(i,pos.getZ(i)+Math.sin(performance.now()*0.0009+i)*dt*0.3);
+      }
+      pos.needsUpdate = true;
+    }
+    fireflies.position.x = Math.round(player.position.x/20)*20;
+    fireflies.position.z = Math.round(player.position.z/20)*20;
+  }
+  if(leaves){
+    const pos = leaves.geometry.attributes.position;
+    for(let i=0;i<pos.count;i++){
+      let y = pos.getY(i) - dt*0.8;
+      let x = pos.getX(i) + Math.sin(performance.now()*0.0008+i)*dt*0.5;
+      if(y < 0){ y = 20; x = (Math.random()-0.5)*60; }
+      pos.setX(i,x); pos.setY(i,y);
+    }
+    pos.needsUpdate = true;
+    leaves.position.x = Math.round(player.position.x/30)*30;
+    leaves.position.z = Math.round(player.position.z/30)*30;
+  }
+  waterMeshes.forEach(w=>{
+    w.position.y = w.userData.baseY + Math.sin(performance.now()*0.001+w.userData.phase)*0.03;
+    w.material.opacity = 0.8 + Math.sin(performance.now()*0.002+w.userData.phase)*0.1;
+  });
+}
+
+function createHumanoid(opts){
+  const g = new THREE.Group();
+  const skinMat = new THREE.MeshStandardMaterial({color:opts.skin||0xf5c9a0,roughness:0.85});
+  const shirtMat = new THREE.MeshStandardMaterial({color:opts.shirt||0xdd3333,roughness:0.75});
+  const pantsMat = new THREE.MeshStandardMaterial({color:opts.pants||0x2a3a5c,roughness:0.85});
+  const shoeMat = new THREE.MeshStandardMaterial({color:opts.shoe||0x111111,roughness:0.6});
+  const hairMat = new THREE.MeshStandardMaterial({color:opts.hair||0x3a2418,roughness:0.9});
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.28,0.5,8,16),shirtMat); torso.position.y=1.28; torso.castShadow=true; g.add(torso);
+  if(opts.vest){ const vest = new THREE.Mesh(new THREE.CapsuleGeometry(0.3,0.42,8,16),new THREE.MeshStandardMaterial({color:opts.vest,roughness:0.7})); vest.position.y=1.34; g.add(vest);
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.55,0.06,0.5),new THREE.MeshStandardMaterial({color:0xffffff})); stripe.position.y=1.35; stripe.position.z=0.02; g.add(stripe); }
+  const belt = new THREE.Mesh(new THREE.BoxGeometry(0.62,0.1,0.46),new THREE.MeshStandardMaterial({color:0x1a1a1a})); belt.position.y=1.02; g.add(belt);
+  const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.15,0.1,0.05),new THREE.MeshStandardMaterial({color:0xffd700,metalness:0.7,roughness:0.3})); buckle.position.set(0,1.02,0.24); g.add(buckle);
+  function makeLeg(side){ const lg = new THREE.Group(); lg.position.set(side*0.15,0.88,0); const u = new THREE.Mesh(new THREE.CapsuleGeometry(0.1,0.35,4,8),pantsMat); u.position.y=-0.22; u.castShadow=true; lg.add(u); const l = new THREE.Mesh(new THREE.CapsuleGeometry(0.09,0.28,4,8),pantsMat); l.position.y=-0.62; lg.add(l); const s = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.11,0.32),shoeMat); s.position.set(0,-0.87,0.06); lg.add(s); const sole = new THREE.Mesh(new THREE.BoxGeometry(0.22,0.04,0.34),new THREE.MeshStandardMaterial({color:0xffffff})); sole.position.set(0,-0.93,0.06); lg.add(sole); return lg; }
+  const legL=makeLeg(-1),legR=makeLeg(1); g.add(legL,legR);
+  function makeArm(side){ const ag = new THREE.Group(); ag.position.set(side*0.38,1.52,0); const u = new THREE.Mesh(new THREE.CapsuleGeometry(0.09,0.3,4,8),shirtMat); u.position.y=-0.18; ag.add(u); const l = new THREE.Mesh(new THREE.CapsuleGeometry(0.08,0.26,4,8),skinMat); l.position.y=-0.52; ag.add(l); const h = new THREE.Mesh(new THREE.SphereGeometry(0.1,10,10),skinMat); h.position.y=-0.73; ag.add(h); return ag; }
+  const armL=makeArm(-1),armR=makeArm(1); g.add(armL,armR);
+  g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,0.1,8),skinMat).translateY(1.62));
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.52,0.5),skinMat); head.position.y=1.88; head.castShadow=true; g.add(head);
+  const earL = new THREE.Mesh(new THREE.SphereGeometry(0.06,8,8),skinMat); earL.position.set(-0.26,1.88,0); g.add(earL);
+  const earR = earL.clone(); earR.position.x = 0.26; g.add(earR);
+  const eyeWhite = new THREE.MeshBasicMaterial({color:0xffffff});
+  const eyePupil = new THREE.MeshBasicMaterial({color:0x000000});
+  const eyeL_w = new THREE.Mesh(new THREE.CircleGeometry(0.07,12),eyeWhite); eyeL_w.position.set(-0.11,1.9,0.26); g.add(eyeL_w);
+  const eyeR_w = eyeL_w.clone(); eyeR_w.position.x = 0.11; g.add(eyeR_w);
+  const pupL = new THREE.Mesh(new THREE.CircleGeometry(0.04,10),eyePupil); pupL.position.set(-0.11,1.9,0.261); g.add(pupL);
+  const pupR = pupL.clone(); pupR.position.x = 0.11; g.add(pupR);
+  const mouth = new THREE.Mesh(new THREE.PlaneGeometry(0.1,0.02),new THREE.MeshBasicMaterial({color:0x5a2020})); mouth.position.set(0,1.78,0.26); g.add(mouth);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.03,0.06,6),skinMat); nose.rotation.x = Math.PI/2; nose.position.set(0,1.84,0.28); g.add(nose);
+  const hair = new THREE.Mesh(new THREE.BoxGeometry(0.55,0.35,0.55),hairMat); hair.position.y=2.02; g.add(hair);
+  const bang = new THREE.Mesh(new THREE.BoxGeometry(0.52,0.15,0.08),hairMat); bang.position.set(0,1.95,0.26); g.add(bang);
+  const sideL = new THREE.Mesh(new THREE.BoxGeometry(0.08,0.28,0.4),hairMat); sideL.position.set(-0.28,1.94,0.05); g.add(sideL);
+  const sideR = sideL.clone(); sideR.position.x = 0.28; g.add(sideR);
+  const backHair = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.4,0.15),hairMat); backHair.position.set(0,1.85,-0.28); g.add(backHair);
+  if(opts.cap){ const capMat = new THREE.MeshStandardMaterial({color:opts.cap,roughness:0.7}); const cap = new THREE.Mesh(new THREE.BoxGeometry(0.6,0.22,0.6),capMat); cap.position.y=2.22; g.add(cap);
+    if(opts.capBand){ const band = new THREE.Mesh(new THREE.BoxGeometry(0.62,0.08,0.62),new THREE.MeshStandardMaterial({color:opts.capBand})); band.position.y = 2.13; g.add(band); }
+    const brim = new THREE.Mesh(new THREE.BoxGeometry(0.55,0.05,0.28),capMat); brim.position.set(0,2.11,0.42); g.add(brim);
+    const brimEdge = new THREE.Mesh(new THREE.BoxGeometry(0.56,0.02,0.3),new THREE.MeshStandardMaterial({color:0xffffff})); brimEdge.position.set(0,2.09,0.42); g.add(brimEdge);
+  }
+  if(opts.pack){ const pack = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.65,0.28),new THREE.MeshStandardMaterial({color:opts.pack,roughness:0.7})); pack.position.set(0,1.35,-0.4); pack.castShadow=true; g.add(pack);
+    const strap1 = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.06,0.3),new THREE.MeshStandardMaterial({color:0x1a1a1a})); strap1.position.set(0,1.62,-0.4); g.add(strap1);
+    const detail = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.4,0.05),new THREE.MeshStandardMaterial({color:0xffffff})); detail.position.set(0,1.35,-0.55); g.add(detail);
+    const pocket = new THREE.Mesh(new THREE.BoxGeometry(0.4,0.25,0.1),new THREE.MeshStandardMaterial({color:0x222222})); pocket.position.set(0,1.2,-0.55); g.add(pocket);
+  }
+  const aura = new THREE.Mesh(new THREE.CircleGeometry(0.55,20),new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:0.28})); aura.rotation.x = -Math.PI/2; aura.position.y = 0.02; g.add(aura);
+  g.userData = {legL,legR,armL,armR,walkPhase:0,isWalking:false,baseY:0};
+  return g;
+}
+
+const MATS = {treeTrunk: new THREE.MeshStandardMaterial({color:0x6b4423,roughness:0.9}),treeLeaf: new THREE.MeshStandardMaterial({color:0x2e7d32,roughness:0.85}),treeLeaf2: new THREE.MeshStandardMaterial({color:0x388e3c,roughness:0.85}),rock: new THREE.MeshStandardMaterial({color:0x808080,roughness:0.95,flatShading:true}),path: new THREE.MeshStandardMaterial({color:0xd2b48c,roughness:0.9}),wall: new THREE.MeshStandardMaterial({color:0xa87878,side:THREE.DoubleSide,roughness:0.85}),ceiling: new THREE.MeshStandardMaterial({color:0xdddddd,roughness:0.9}),floor: new THREE.MeshStandardMaterial({color:0xf0e8d8,roughness:0.9})};
+const GEOS = {treeTrunk: new THREE.CylinderGeometry(.25,.35,1.6,6),treeLeaf: new THREE.ConeGeometry(1.3,2.4,6),rock: new THREE.DodecahedronGeometry(.9,0),blade: new THREE.ConeGeometry(.12,.55,4)};
+
+function addTreeToZone(x,z){
+  const type = Math.random();
+  const g = new THREE.Group();
+  if(type < 0.6){
+    const t = new THREE.Mesh(GEOS.treeTrunk,MATS.treeTrunk); t.position.y=.8; t.castShadow=true; g.add(t);
+    const l1 = new THREE.Mesh(new THREE.SphereGeometry(1.4,10,10),MATS.treeLeaf); l1.position.y=2.6; l1.castShadow=true; g.add(l1);
+    const l2 = new THREE.Mesh(new THREE.SphereGeometry(1.1,10,10),MATS.treeLeaf2); l2.position.y=3.4; l2.castShadow=true; g.add(l2);
+    const l3 = new THREE.Mesh(new THREE.SphereGeometry(0.9,10,10),MATS.treeLeaf); l3.position.y=2.2; l3.position.x=0.5; g.add(l3);
+  } else if(type < 0.85){
+    const t = new THREE.Mesh(GEOS.treeTrunk,MATS.treeTrunk); t.position.y=.8; t.castShadow=true; g.add(t);
+    for(let i=0;i<3;i++){ const l = new THREE.Mesh(new THREE.ConeGeometry(1.5-i*0.35,1.6,8),MATS.treeLeaf); l.position.y = 1.8 + i*0.9; l.castShadow=true; g.add(l); }
+  } else {
+    const t = new THREE.Mesh(new THREE.CylinderGeometry(.3,.5,2.2,7),MATS.treeTrunk); t.position.y=1.1; t.castShadow=true; g.add(t);
+    for(let i=0;i<5;i++){ const angle = (i/5)*Math.PI*2; const l = new THREE.Mesh(new THREE.SphereGeometry(1.2,8,8),MATS.treeLeaf); l.position.set(Math.cos(angle)*0.9,2.5+Math.random()*0.5,Math.sin(angle)*0.9); l.castShadow=true; g.add(l); }
+    const top = new THREE.Mesh(new THREE.SphereGeometry(1.4,10,10),MATS.treeLeaf2); top.position.y = 3.4; g.add(top);
+  }
+  g.position.set(x,0,z); g.rotation.y=Math.random()*Math.PI*2; g.scale.setScalar(0.85+Math.random()*0.35);
+  currentZoneGroup.add(g);
+  colliders.push({x,z,r:1.1});
+}
+function addRockToZone(x,z){ const r = new THREE.Mesh(GEOS.rock,MATS.rock); r.position.set(x,.4,z); r.rotation.set(Math.random()*3,Math.random()*3,Math.random()*3); r.scale.setScalar(0.6+Math.random()*0.8); r.castShadow=true; currentZoneGroup.add(r); colliders.push({x,z,r:.9}); }
+function addFlowerToZone(x,z){
+  const colors = [0xff6b9d,0xffe066,0xa29bfe,0xff8b94,0x74b9ff];
+  const color = colors[Math.floor(Math.random()*colors.length)];
+  const g = new THREE.Group();
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.3,5),new THREE.MeshStandardMaterial({color:0x2e7d32})); stem.position.y = 0.15; g.add(stem);
+  const flower = new THREE.Mesh(new THREE.SphereGeometry(0.08,8,8),new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:0.3})); flower.position.y = 0.32; g.add(flower);
+  for(let i=0;i<5;i++){ const angle = (i/5)*Math.PI*2; const petal = new THREE.Mesh(new THREE.SphereGeometry(0.05,6,6),new THREE.MeshStandardMaterial({color})); petal.position.set(Math.cos(angle)*0.1,0.32,Math.sin(angle)*0.1); g.add(petal); }
+  g.position.set(x,0,z); currentZoneGroup.add(g);
+}
+function addBushToZone(x,z){
+  const g = new THREE.Group();
+  for(let i=0;i<3;i++){ const b = new THREE.Mesh(new THREE.SphereGeometry(0.4+Math.random()*0.2,8,8),MATS.treeLeaf2); b.position.set((Math.random()-0.5)*0.4,0.35+Math.random()*0.15,(Math.random()-0.5)*0.4); b.castShadow = true; g.add(b); }
+  g.position.set(x,0,z); currentZoneGroup.add(g); colliders.push({x,z,r:0.7});
+}
+function addPondToZone(x,z,size=6){
+  const pond = new THREE.Mesh(new THREE.CircleGeometry(size,24),new THREE.MeshStandardMaterial({color:0x2090d0,roughness:0.15,metalness:0.4,transparent:true,opacity:0.85}));
+  pond.rotation.x = -Math.PI/2; pond.position.set(x,0.03,z);
+  pond.userData = {isWater:true,baseY:0.03,phase:Math.random()*10};
+  currentZoneGroup.add(pond); waterMeshes.push(pond);
+  for(let i=0;i<8;i++){ const a = (i/8)*Math.PI*2; const stone = new THREE.Mesh(GEOS.rock,MATS.rock); stone.position.set(x+Math.cos(a)*size*0.95,0.3,z+Math.sin(a)*size*0.95); stone.scale.setScalar(0.4+Math.random()*0.3); currentZoneGroup.add(stone); }
+  colliders.push({x,z,r:size*0.9});
+}
+function addGrassToZone(cx,cz,w,h,minLv,maxLv,zoneName){
+  const p = new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshStandardMaterial({color:0x3b7d2a,roughness:1})); p.rotation.x = -Math.PI/2; p.position.set(cx,.02,cz); p.receiveShadow=true; currentZoneGroup.add(p);
+  grassPatches.push({x:cx,z:cz,w,h,minLv,maxLv,zone:zoneName});
+  const colors = [0x4caf50,0x2e7d32,0x66bb6a];
+  colors.forEach((color,idx)=>{ const count = isMobile?60:120; const blades = new THREE.InstancedMesh(GEOS.blade,new THREE.MeshStandardMaterial({color,roughness:0.85}),count); const dummy = new THREE.Object3D(); for(let i=0;i<count;i++){ dummy.position.set(cx+(Math.random()-.5)*w,.28+idx*0.02,cz+(Math.random()-.5)*h); dummy.rotation.y = Math.random()*Math.PI; const s = 0.7+Math.random()*0.7; dummy.scale.set(s,s*1.3,s); dummy.updateMatrix(); blades.setMatrixAt(i,dummy.matrix); } blades.castShadow=false; currentZoneGroup.add(blades); });
+  setTimeout(()=>{ if(currentZoneGroup) spawnOverworldPokemon({x:cx,z:cz,w,h,minLv,maxLv,zone:zoneName}); }, 50);
+}
+
+function spawnOverworldPokemon(g){
+  const count = 3 + Math.floor(Math.random()*3);
+  const pool = Object.keys(DEX).map(Number).filter(id => { if([144,145,146,150,151,243,244,245,249,250,251,380,381,384].includes(id)) return false; return DEX[id].stats[0] < 100; });
+  for(let i=0;i<count;i++){
+    const speciesId = pool[Math.floor(Math.random()*pool.length)];
+    const level = g.minLv + Math.floor(Math.random()*(g.maxLv-g.minLv+1));
+    const isShiny = Math.random() < 1/512;
+    const spriteUrl = isShiny ? SPRITE_SHINY(speciesId) : SPRITE(speciesId);
+    const tex = new THREE.TextureLoader().load(spriteUrl);
+    const spr = new THREE.Sprite(new THREE.SpriteMaterial({map:tex, transparent:true, depthTest:false}));
+    spr.scale.set(1.8,1.8,1);
+    const px = g.x + (Math.random()-.5)*g.w*0.8;
+    const pz = g.z + (Math.random()-.5)*g.h*0.8;
+    spr.position.set(px,1,pz);
+    currentZoneGroup.add(spr);
+    if(isShiny){ const ring = new THREE.PointLight(0xffd700,1.5,4); ring.position.set(px,1.2,pz); currentZoneGroup.add(ring); }
+    overworldPokemon.push({sprite:spr,speciesId,level,isShiny,x:px,z:pz,wanderTimer: Math.random()*2,wanderDir: Math.random()*Math.PI*2,grass: g});
+  }
+}
+function updateOverworldPokemon(dt){
+  if(game.state !== "overworld" || game.overworldPaused || game.inInterior) return;
+  const px = player.position.x, pz = player.position.z;
+  for(let i = overworldPokemon.length-1; i >= 0; i--){
+    const p = overworldPokemon[i];
+    p.wanderTimer -= dt;
+    if(p.wanderTimer <= 0){ p.wanderTimer = 1.5+Math.random()*2; p.wanderDir = Math.random()*Math.PI*2; }
+    const speed = 1.2;
+    const nx = p.x + Math.cos(p.wanderDir)*speed*dt;
+    const nz = p.z + Math.sin(p.wanderDir)*speed*dt;
+    const g = p.grass;
+    if(Math.abs(nx-g.x) < g.w*0.45 && Math.abs(nz-g.z) < g.h*0.45){ p.x = nx; p.z = nz; } else { p.wanderDir += Math.PI; }
+    p.sprite.position.x = p.x; p.sprite.position.z = p.z;
+    p.sprite.position.y = 1 + Math.sin(performance.now()*0.003+i)*0.15;
+    const dist = Math.hypot(px-p.x, pz-p.z);
+    if(dist < 1.8){
+      const mon = new Pokemon(p.speciesId, p.level);
+      if(p.isShiny) mon.isShiny = true;
+      currentZoneGroup.remove(p.sprite);
+      overworldPokemon.splice(i,1);
+      startBattle("wild",mon,null,p.grass.zone);
+      return;
+    }
+  }
+}
+function updateFollowingPokemon(dt){
+  if(game.state !== "overworld" || game.inInterior) return;
+  if(game.player.party.length === 0) return;
+  const lead = game.player.party[0];
+  if(followingMon && followingMon.userData.speciesId !== lead.dexId){ currentZoneGroup.remove(followingMon); followingMon = null; }
+  if(!followingMon){
+    const url = lead.isShiny ? SPRITE_SHINY(lead.dexId) : SPRITE(lead.dexId);
+    const tex = new THREE.TextureLoader().load(url);
+    const spr = new THREE.Sprite(new THREE.SpriteMaterial({map:tex, transparent:true, depthTest:false}));
+    spr.scale.set(1.4,1.4,1);
+    spr.userData.speciesId = lead.dexId;
+    currentZoneGroup.add(spr);
+    followingMon = spr;
+  }
+  const targetX = player.position.x - Math.sin(player.rotation.y)*1.2;
+  const targetZ = player.position.z - Math.cos(player.rotation.y)*1.2;
+  followingMon.position.x += (targetX - followingMon.position.x)*Math.min(1,dt*6);
+  followingMon.position.z += (targetZ - followingMon.position.z)*Math.min(1,dt*6);
+  followingMon.position.y = player.position.y + 0.7;
+}
+function resetFollowingPokemon(){ if(followingMon && currentZoneGroup){ try{ currentZoneGroup.remove(followingMon); }catch(e){} } followingMon = null; }
+
+function addGymToZone(gym,x,z){
+  const g = new THREE.Group();
+  const col = new THREE.Color(TYPE_COLORS[gym.type]||"#888");
+  const base = new THREE.Mesh(new THREE.BoxGeometry(10,5,10),new THREE.MeshStandardMaterial({color:col,roughness:0.7})); base.position.y=2.5; base.castShadow=true; base.receiveShadow=true; g.add(base);
+  const tower = new THREE.Mesh(new THREE.CylinderGeometry(2.8,2.8,4,10),new THREE.MeshStandardMaterial({color:col,roughness:0.7})); tower.position.y=7; g.add(tower);
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(3.4,2.4,10),new THREE.MeshStandardMaterial({color:0x222222})); roof.position.y=10.2; g.add(roof);
+  const door = new THREE.Mesh(new THREE.BoxGeometry(2.4,3.4,.3),new THREE.MeshStandardMaterial({color:0x4a2a10})); door.position.set(0,1.7,5.05); g.add(door);
+  const winMat = new THREE.MeshStandardMaterial({color:0x88ddff,emissive:0x2288cc,emissiveIntensity:0.4});
+  [-3.2,3.2].forEach(dx=>{ const w = new THREE.Mesh(new THREE.BoxGeometry(1.4,1.4,0.1),winMat); w.position.set(dx,3.8,5.05); g.add(w); });
+  g.position.set(x,0,z); currentZoneGroup.add(g);
+  colliders.push({x,z,r:5.2}); gymMeshes.push({gym,pos:[x,z]});
+}
+function addHouseToZone(x,z,color){
+  const g = new THREE.Group();
+  const walls = new THREE.Mesh(new THREE.BoxGeometry(6,4,6),new THREE.MeshStandardMaterial({color,roughness:0.85})); walls.position.y=2; walls.castShadow=true; walls.receiveShadow=true; g.add(walls);
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(5,2.6,4),new THREE.MeshStandardMaterial({color:0xa0241a})); roof.position.y=5.3; roof.rotation.y=Math.PI/4; g.add(roof);
+  const door = new THREE.Mesh(new THREE.BoxGeometry(1.2,2.2,.15),new THREE.MeshStandardMaterial({color:0x4a2a10})); door.position.set(0,1.1,3.05); g.add(door);
+  const winMat = new THREE.MeshStandardMaterial({color:0x88ddff,emissive:0x2288cc,emissiveIntensity:0.3});
+  const win = new THREE.Mesh(new THREE.BoxGeometry(1.3,1.3,.1),winMat); win.position.set(1.9,2.2,3.05); g.add(win);
+  const win2 = win.clone(); win2.position.x=-1.9; g.add(win2);
+  g.position.set(x,0,z); currentZoneGroup.add(g); colliders.push({x,z,r:3.6});
+}
+function addCenterToZone(x,z){
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.BoxGeometry(9,5.5,9),new THREE.MeshStandardMaterial({color:0xffffff})); base.position.y=2.75; base.castShadow=true; g.add(base);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(9.5,1.4,9.5),new THREE.MeshStandardMaterial({color:0xff3333})); roof.position.y=6.1; g.add(roof);
+  const crossMat = new THREE.MeshBasicMaterial({color:0xff3333});
+  const cv = new THREE.Mesh(new THREE.BoxGeometry(.7,2,.7),crossMat); cv.position.set(0,8.3,0); g.add(cv);
+  const ch = new THREE.Mesh(new THREE.BoxGeometry(2,.7,.7),crossMat); ch.position.set(0,8.3,0); g.add(ch);
+  g.position.set(x,0,z); currentZoneGroup.add(g); colliders.push({x,z,r:4.6}); centers.push({x,z});
+}
+function addMartToZone(x,z){
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.BoxGeometry(8,5,8),new THREE.MeshStandardMaterial({color:0xffffff})); base.position.y=2.5; base.castShadow=true; g.add(base);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(8.5,1.4,8.5),new THREE.MeshStandardMaterial({color:0x2196f3})); roof.position.y=5.6; g.add(roof);
+  const sign = new THREE.Mesh(new THREE.BoxGeometry(3.5,.9,.2),new THREE.MeshStandardMaterial({color:0x0d47a1})); sign.position.set(0,6.9,0); g.add(sign);
+  const door = new THREE.Mesh(new THREE.BoxGeometry(2,2.8,.2),new THREE.MeshStandardMaterial({color:0x1a1a1a})); door.position.set(0,1.4,4.05); g.add(door);
+  g.position.set(x,0,z); currentZoneGroup.add(g); colliders.push({x,z,r:4.2}); marts.push({x,z});
+}
+function addAirportToZone(x,z){
+  const g = new THREE.Group();
+  const terminal = new THREE.Mesh(new THREE.BoxGeometry(16,5.5,12),new THREE.MeshStandardMaterial({color:0xd8d8e8})); terminal.position.y=2.75; terminal.castShadow=true; g.add(terminal);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(17,1.2,13),new THREE.MeshStandardMaterial({color:0x666688})); roof.position.y=6.1; g.add(roof);
+  const tower = new THREE.Mesh(new THREE.CylinderGeometry(1.4,1.6,9,10),new THREE.MeshStandardMaterial({color:0xf0f0f0})); tower.position.set(7,4.5,0); g.add(tower);
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(1.7,14,14,0,Math.PI*2,0,Math.PI/2),new THREE.MeshStandardMaterial({color:0x88ddff,emissive:0x2266aa,emissiveIntensity:0.3})); dome.position.set(7,9,0); g.add(dome);
+  g.position.set(x,0,z); currentZoneGroup.add(g); colliders.push({x,z,r:10}); airports.push({x,z});
+}
+function addNPCToZone(n){
+  const npc = createHumanoid({ shirt:n.color,hair:n.opts?.hair||0x5a3a1a,skin:n.opts?.skin||0xf5c9a0,cap:n.opts?.cap||null,capBand:n.opts?.capBand||null,pack:n.opts?.pack||null,vest:n.opts?.vest||null,pants:n.opts?.pants||0x333344,shoe:n.opts?.shoe||0x111111 });
+  npc.position.set(n.x,0,n.z); currentZoneGroup.add(npc);
+  NPCs.push({mesh:npc,x:n.x,z:n.z,name:n.name,text:n.text||"...",action:n.action||null,r:1.2});
+  colliders.push({x:n.x,z:n.z,r:1.2});
+}
+function addRouteSignToZone(text,x,z,angle=0){
+  const g = new THREE.Group();
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(.15,.15,2.6,6),MATS.treeTrunk); post.position.y=1.3; g.add(post);
+  const c = document.createElement("canvas"); c.width=512; c.height=180; const ctx = c.getContext("2d");
+  ctx.fillStyle = "#8b5a2b"; ctx.fillRect(0,0,512,180); ctx.strokeStyle = "#fff"; ctx.lineWidth=8; ctx.strokeRect(10,10,492,160);
+  ctx.fillStyle = "#fff"; ctx.font = "bold 68px Trebuchet MS"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(text,256,90);
+  const tex = new THREE.CanvasTexture(c);
+  const board = new THREE.Mesh(new THREE.BoxGeometry(3.2,1.1,0.15),[MATS.treeTrunk,MATS.treeTrunk,MATS.treeTrunk,MATS.treeTrunk,new THREE.MeshBasicMaterial({map:tex}),MATS.treeTrunk]);
+  board.position.set(0,2.6,0); g.add(board); g.position.set(x,0,z); g.rotation.y = angle; currentZoneGroup.add(g); colliders.push({x,z,r:0.4});
+}
+
+function loadZone(zoneId){
+  if(currentZoneGroup){ scene.remove(currentZoneGroup); currentZoneGroup.traverse(o=>{ if(o.geometry && !Object.values(GEOS).includes(o.geometry)) o.geometry.dispose(); }); }
+  colliders=[];NPCs=[];gymMeshes=[];grassPatches=[];marts=[];centers=[];airports=[];
+  overworldPokemon=[];waterMeshes=[];
+  resetFollowingPokemon();
+  const zone = ZONES[zoneId]; currentZoneId = zoneId; currentZoneData = zone;
+  currentZoneGroup = new THREE.Group(); scene.add(currentZoneGroup);
+  const {w,h} = zone.size;
+  const cv = document.createElement("canvas"); cv.width = cv.height = 128; const ctx = cv.getContext("2d");
+  ctx.fillStyle = "#5cb85c"; ctx.fillRect(0,0,128,128);
+  for(let i=0;i<800;i++){ ctx.fillStyle = `rgba(${40+Math.random()*40},${120+Math.random()*80},${40+Math.random()*40},${0.3+Math.random()*0.3})`; ctx.fillRect(Math.random()*128,Math.random()*128,2,2); }
+  const tex = new THREE.CanvasTexture(cv); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(w/10,h/10); tex.colorSpace = THREE.SRGBColorSpace;
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshStandardMaterial({map:tex,roughness:0.95})); ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; currentZoneGroup.add(ground);
+  Object.keys(zone.exits||{}).forEach(dir=>{
+    let p;
+    if(dir === "north"){ p = new THREE.Mesh(new THREE.PlaneGeometry(8,h/2),MATS.path); p.rotation.x=-Math.PI/2; p.position.set(0,0.01,-h/4); }
+    else if(dir === "south"){ p = new THREE.Mesh(new THREE.PlaneGeometry(8,h/2),MATS.path); p.rotation.x=-Math.PI/2; p.position.set(0,0.01,h/4); }
+    else if(dir === "east"){ p = new THREE.Mesh(new THREE.PlaneGeometry(w/2,8),MATS.path); p.rotation.x=-Math.PI/2; p.position.set(w/4,0.01,0); }
+    else if(dir === "west"){ p = new THREE.Mesh(new THREE.PlaneGeometry(w/2,8),MATS.path); p.rotation.x=-Math.PI/2; p.position.set(-w/4,0.01,0); }
+    if(p) currentZoneGroup.add(p);
+  });
+  if(zone.grass) zone.grass.forEach(g => addGrassToZone(g.x,g.z,g.w,g.h,g.min,g.max,zone.name));
+  if(zone.hasCenter) addCenterToZone(-25,-40);
+  if(zone.hasMart) addMartToZone(25,-40);
+  if(zone.gymId){ const gym = GYMS.find(g => g.id === zone.gymId); if(gym) addGymToZone(gym,0,-h/4-10); }
+  if(zone.houses) zone.houses.forEach(ho => addHouseToZone(ho.x,ho.z,ho.color));
+  if(zone.hasAirport) addAirportToZone(w/2-35,h/2-35);
+  const blocked = [];
+  Object.keys(zone.exits||{}).forEach(dir=>{ if(dir === "north") blocked.push({x:0,z:-h/2+20,r:22}); if(dir === "south") blocked.push({x:0,z:h/2-20,r:22}); if(dir === "east") blocked.push({x:w/2-20,z:0,r:22}); if(dir === "west") blocked.push({x:-w/2+20,z:0,r:22}); });
+  blocked.push({x:0,z:0,r:15});
+  let placed = 0; const maxTrees = isMobile?30:55;
+  while(placed < maxTrees){
+    const x = (Math.random()-0.5)*(w-10), z = (Math.random()-0.5)*(h-10);
+    let bad = false;
+    for(const b of blocked){ if(Math.hypot(x-b.x,z-b.z) < b.r){ bad=true; break; } }
+    for(const c of colliders){ if(Math.hypot(x-c.x,z-c.z) < 3){ bad=true; break; } }
+    if(bad) continue;
+    let inGrass = false;
+    if(zone.grass){ for(const g of zone.grass){ if(Math.abs(x-g.x)<g.w/2+1 && Math.abs(z-g.z)<g.h/2+1){ inGrass=true; break; } } }
+    if(inGrass) continue;
+    const r = Math.random();
+    if(r < 0.65) addTreeToZone(x,z);
+    else if(r < 0.8) addBushToZone(x,z);
+    else if(r < 0.92) addFlowerToZone(x,z);
+    else addRockToZone(x,z);
+    placed++;
+  }
+  if(zone.type === "route" && Math.random() < 0.6){
+    const px = (Math.random()-0.5)*(w*0.5), pz = (Math.random()-0.5)*(h*0.5);
+    addPondToZone(px,pz,5+Math.random()*3);
+  }
+  addRouteSignToZone(zone.name,0,h/2-12,Math.PI);
+  if(zone.npcs) zone.npcs.forEach(addNPCToZone);
+  showRegion(zone.name);
+  setTimeout(()=>{ if(game.player.party.length > 0) updateFollowingPokemon(0.01); }, 100);
+}
+
+const OPPOSITE = {north:"south",south:"north",east:"west",west:"east"};
+const fadeEl = document.getElementById("zoneFade");
+function transitionToZone(targetZoneId,exitDir){
+  if(transitioning) return;
+  transitioning = true; game.overworldPaused = true; fadeEl.style.opacity = 1;
+  setTimeout(()=>{
+    loadZone(targetZoneId);
+    const newDir = OPPOSITE[exitDir]; const {w,h} = currentZoneData.size; const edge = 5;
+    if(newDir === "north") player.position.set(0,0,-h/2+edge);
+    else if(newDir === "south") player.position.set(0,0,h/2-edge);
+    else if(newDir === "east") player.position.set(w/2-edge,0,0);
+    else if(newDir === "west") player.position.set(-w/2+edge,0,0);
+    player.userData.baseY = 0; transitionCooldown = 1.0;
+    requestAnimationFrame(()=>fadeEl.style.opacity = 0);
+    setTimeout(()=>{ transitioning = false; game.overworldPaused = false; },400);
+    if(game.flags.starter) setTimeout(autoSave,300);
+  },400);
+}
+function checkZoneTransition(){
+  if(!currentZoneData || transitioning || game.overworldPaused) return;
+  if(transitionCooldown > 0) return;
+  const {w,h} = currentZoneData.size; const px = player.position.x,pz = player.position.z; const margin = 2;
+  const exits = currentZoneData.exits || {};
+  for(const [dir,exit] of Object.entries(exits)){
+    let trigger = false;
+    if(dir === "north" && pz < -h/2+margin) trigger = true;
+    else if(dir === "south" && pz > h/2-margin) trigger = true;
+    else if(dir === "east" && px > w/2-margin) trigger = true;
+    else if(dir === "west" && px < -w/2+margin) trigger = true;
+    if(trigger){ transitionToZone(exit.to,dir); return; }
+  }
+}
+
+let interiorState = null;
+function enterGym(gym){
+  if(game.player.defeated.has(gym.id)){ showDialog(gym.name,"Ya obtuviste esta medalla."); return; }
+  if(gym.id >= 9 && !game.flags.planeUnlocked){ showDialog("Gimnasio cerrado","Solo accesible tras vencer la Liga de Kanto Nova."); return; }
+  const baseY = 400 + gym.id*20;
+  player.userData.baseY = baseY; player.position.set(0,baseY,8); camYaw = 0; game.inInterior = true;
+  resetFollowingPokemon();
+  if(!interiorState || interiorState.type!=="gym" || interiorState.gymId !== gym.id){
+    if(interiorState) scene.remove(interiorState.group);
+    const grp = new THREE.Group(); grp.position.y = baseY;
+    const col = new THREE.Color(TYPE_COLORS[gym.type]||"#888");
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(22,22),new THREE.MeshStandardMaterial({color:0xf0e8d8,roughness:0.9})); floor.rotation.x = -Math.PI/2; floor.receiveShadow=true; grp.add(floor);
+    const carpet = new THREE.Mesh(new THREE.PlaneGeometry(8,18),new THREE.MeshStandardMaterial({color:col,roughness:0.85})); carpet.rotation.x = -Math.PI/2; carpet.position.y = 0.02; grp.add(carpet);
+    const wallGeo = new THREE.PlaneGeometry(22,7);
+    [[0,-11,0],[0,11,Math.PI],[11,0,-Math.PI/2],[-11,0,Math.PI/2]].forEach(([wx,wz,ry])=>{ const ww = new THREE.Mesh(wallGeo,MATS.wall); ww.position.set(wx,3.5,wz); ww.rotation.y=ry; grp.add(ww); });
+    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(22,22),MATS.ceiling); ceil.rotation.x = Math.PI/2; ceil.position.y=7; grp.add(ceil);
+    grp.add(new THREE.PointLight(0xffffff,1.6,30).translateY(6));
+    grp.add(new THREE.PointLight(col,1.4,24).translateY(4).translateZ(-6));
+    for(let i=0;i<4;i++){ const c = new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.4,4,10),new THREE.MeshStandardMaterial({color:0xdddddd,metalness:0.3,roughness:0.5})); c.position.set(i%2===0?-7:7,2,-7+Math.floor(i/2)*14); c.castShadow=true; grp.add(c); }
+    const door = new THREE.Mesh(new THREE.BoxGeometry(2.4,3.6,0.2),new THREE.MeshStandardMaterial({color:0x6b4423,roughness:0.7})); door.position.set(0,1.8,10.9); grp.add(door);
+    const leader = createHumanoid({shirt:col,pants:0x222233,hair:0x222222}); leader.position.set(0,0,-7); grp.add(leader);
+    const lc = document.createElement("canvas"); lc.width=512; lc.height=100; const lctx = lc.getContext("2d");
+    lctx.fillStyle = "rgba(0,0,0,.75)"; lctx.fillRect(0,0,512,100); lctx.strokeStyle = "#ffd700"; lctx.lineWidth=4; lctx.strokeRect(2,2,508,96);
+    lctx.fillStyle = "#ffd700"; lctx.font="bold 56px Trebuchet MS"; lctx.textAlign="center"; lctx.textBaseline="middle"; lctx.fillText(gym.name,256,50);
+    const lspr = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(lc),transparent:true,depthTest:false})); lspr.scale.set(5,1,1); lspr.position.set(0,3.2,-7); grp.add(lspr);
+    for(let i=0;i<4;i++){ const plant = new THREE.Mesh(new THREE.ConeGeometry(0.4,0.9,6),new THREE.MeshStandardMaterial({color:0x4caf50})); plant.position.set(-9+i%2*18,0.45,i<2?-9:9); grp.add(plant); }
+    scene.add(grp); interiorState = {type:"gym",gymId:gym.id,group:grp,gym,baseY};
+  } else { scene.add(interiorState.group); }
+  showLoading("Entrando al Gimnasio de "+gym.name+"...",700);
+}
+function enterCenter(centerData){
+  const baseY = 800 + (centerData.x+centerData.z)*10;
+  player.userData.baseY = baseY; player.position.set(0,baseY,8); camYaw = 0; game.inInterior = true;
+  resetFollowingPokemon();
+  if(!interiorState || interiorState.type!=="center"){
+    if(interiorState) scene.remove(interiorState.group);
+    const grp = new THREE.Group(); grp.position.y = baseY;
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(20,20),new THREE.MeshStandardMaterial({color:0xf0e8d8,roughness:0.9})); floor.rotation.x = -Math.PI/2; floor.receiveShadow=true; grp.add(floor);
+    const carpet = new THREE.Mesh(new THREE.PlaneGeometry(6,14),new THREE.MeshStandardMaterial({color:0xcc2222,roughness:0.85})); carpet.rotation.x = -Math.PI/2; carpet.position.y = 0.02; grp.add(carpet);
+    const wallMat = new THREE.MeshStandardMaterial({color:0xd8c4a8,side:THREE.DoubleSide,roughness:0.9});
+    const wallGeo = new THREE.PlaneGeometry(20,6);
+    [[0,-10,0],[0,10,Math.PI],[10,0,-Math.PI/2],[-10,0,Math.PI/2]].forEach(([wx,wz,ry])=>{ const ww = new THREE.Mesh(wallGeo,wallMat); ww.position.set(wx,3,wz); ww.rotation.y=ry; grp.add(ww); });
+    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(20,20),MATS.ceiling); ceil.rotation.x = Math.PI/2; ceil.position.y = 6; grp.add(ceil);
+    grp.add(new THREE.PointLight(0xffffff,1.5,28).translateY(5));
+    grp.add(new THREE.PointLight(0xff6666,0.8,20).translateY(4).translateZ(-4));
+    const counter = new THREE.Mesh(new THREE.BoxGeometry(6,1,1.2),new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.7})); counter.position.set(0,0.5,-6); counter.castShadow=true; grp.add(counter);
+    const nurse = createHumanoid({shirt:0xff88aa,pants:0xffffff,hair:0xff8888,cap:0xffffff}); nurse.position.set(0,0,-7.5); grp.add(nurse);
+    const crossMat = new THREE.MeshBasicMaterial({color:0xff3333}); const cv1 = new THREE.Mesh(new THREE.BoxGeometry(.4,1.2,.1),crossMat); cv1.position.set(0,1.6,-6.4); grp.add(cv1); const ch1 = new THREE.Mesh(new THREE.BoxGeometry(1.2,.4,.1),crossMat); ch1.position.set(0,1.6,-6.4); grp.add(ch1);
+    const pcMesh = new THREE.Mesh(new THREE.BoxGeometry(1.2,1.8,0.8),new THREE.MeshStandardMaterial({color:0x333344,roughness:0.5})); pcMesh.position.set(-7,0.9,-7); pcMesh.castShadow=true; grp.add(pcMesh);
+    const screen = new THREE.Mesh(new THREE.PlaneGeometry(1,0.7),new THREE.MeshBasicMaterial({color:0x2288cc})); screen.position.set(-7,1.2,-6.6); grp.add(screen);
+    const pcLabel = document.createElement("canvas"); pcLabel.width=256; pcLabel.height=80; const plctx = pcLabel.getContext("2d");
+    plctx.fillStyle = "rgba(0,0,0,.8)"; plctx.fillRect(0,0,256,80); plctx.fillStyle = "#4fc3f7"; plctx.font="bold 40px Trebuchet MS"; plctx.textAlign="center"; plctx.textBaseline="middle"; plctx.fillText("PC",128,40);
+    const plspr = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(pcLabel),transparent:true,depthTest:false})); plspr.scale.set(1.5,0.5,1); plspr.position.set(-7,2.4,-6.6); grp.add(plspr);
+    for(let i=0;i<2;i++){ const poster = new THREE.Mesh(new THREE.PlaneGeometry(1.5,1.5),new THREE.MeshStandardMaterial({color:0x88ddff,emissive:0x2288cc,emissiveIntensity:0.3})); poster.position.set(i<1?-6:6,3.5,-9.9); grp.add(poster); }
+    const door = new THREE.Mesh(new THREE.BoxGeometry(2.4,3.4,0.2),new THREE.MeshStandardMaterial({color:0x6b4423})); door.position.set(0,1.7,9.9); grp.add(door);
+    scene.add(grp); interiorState = {type:"center",group:grp,baseY};
+  } else { scene.add(interiorState.group); }
+  showLoading("Entrando al Centro Pokémon...",700);
+}
+function exitInterior(){
+  if(!interiorState) return;
+  scene.remove(interiorState.group);
+  player.userData.baseY = 0; player.position.set(0,0,0); game.inInterior = false;
+  if(interiorState.type === "center"){ player.position.set(-25,0,-20); }
+  else if(interiorState.type === "gym"){ player.position.set(0,0,20); }
+  interiorState = null;
+  setTimeout(()=>{ if(game.player.party.length > 0) updateFollowingPokemon(0.01); }, 100);
+}
+
+const STORY = {chapter:0,flags:{metMay:false,eclipseSeen:false,brockDone:false,eclipseEncounter1:false,eclipseEncounter2:false,eclipseEncounter3:false,kantoChampionDone:false,aureliaArrived:false,aureliaChampionDone:false,eclipseBaseDone:false,rayquazaRescued:false,postGameStarted:false}};
+const CHAPTERS = [{n:0,title:"El Despertar",sub:"Bienvenido a Kanto Nova"},{n:1,title:"El Primer Paso",sub:"Los caminos se bifurcan"},{n:2,title:"Sombras en la Ciudad",sub:"Algo oscuro se acerca"},{n:3,title:"El Eclipse se Alza",sub:"Team Eclipse aparece"},{n:4,title:"La Liga de Kanto Nova",sub:"El Campeón te espera"},{n:5,title:"Un Nuevo Mundo",sub:"Aurelia, la región del norte"},{n:6,title:"El Eclipse Crece",sub:"La sombra se extiende"},{n:7,title:"La Base Secreta",sub:"El corazón del Eclipse"},{n:8,title:"El Legado de Aurelia",sub:"La Liga norteña"},{n:9,title:"El Despertar de Rayquaza",sub:"El cielo se oscurece"},{n:10,title:"La Batalla Final",sub:"El destino de dos regiones"},{n:11,title:"Post-Game",sub:"Los legendarios ancestrales"}];
+function showChapter(n){
+  const ch = CHAPTERS[n]; if(!ch) return; STORY.chapter = n;
+  const overlay = document.getElementById("chapterOverlay");
+  document.getElementById("chapNum").textContent = ch.n;
+  document.getElementById("chapTitle").textContent = ch.title;
+  document.getElementById("chapSub").textContent = ch.sub;
+  overlay.classList.add("show");
+  if(musicEnabled) stopMusicLoop();
+  if(audioCtx){ const now = audioCtx.currentTime; [523.25,659.25,783.99,1046.5].forEach((f,i)=>{ const osc = audioCtx.createOscillator(); const g = audioCtx.createGain(); osc.type = "square"; osc.frequency.value = f; g.gain.setValueAtTime(0,now+i*0.15); g.gain.linearRampToValueAtTime(0.15,now+i*0.15+0.02); g.gain.exponentialRampToValueAtTime(0.001,now+i*0.15+0.4); osc.connect(g); g.connect(audioCtx.destination); osc.start(now+i*0.15); osc.stop(now+i*0.15+0.5); }); }
+  setTimeout(()=>{ overlay.classList.remove("show"); if(musicEnabled) startMusicLoop(); },3500);
+}
+function setMission(text){ STORY.mission = text; document.getElementById("missionText").textContent = text; }
+
+let cutsceneQueue = [],cutsceneActive = false,cutsceneCallback = null;
+function showCutscene(lines,callback){ cutsceneQueue = lines.slice(); cutsceneActive = true; cutsceneCallback = callback; game.overworldPaused = true; document.getElementById("cutscene").classList.add("show"); nextCutsceneLine(); }
+function nextCutsceneLine(){
+  if(cutsceneQueue.length === 0){ document.getElementById("cutscene").classList.remove("show"); cutsceneActive = false; game.overworldPaused = false; const cb = cutsceneCallback; cutsceneCallback = null; if(cb) cb(); return; }
+  const line = cutsceneQueue.shift();
+  document.getElementById("cutChar").textContent = line.icon || "❓";
+  document.getElementById("cutName").textContent = line.name || "???";
+  document.getElementById("cutText").innerHTML = line.text || "";
+}
+document.getElementById("cutscene").addEventListener("click", ()=>{ if(cutsceneActive) nextCutsceneLine(); });
+
+function addEclipseNPC(x,z,name,text,action){
+  const npc = createHumanoid({shirt:0x1a1a1a,pants:0x0a0a0a,shoe:0x111111,hair:0x000000,cap:0x2a0a4a,pack:0x2a0a4a});
+  npc.position.set(x,0,z); currentZoneGroup.add(npc);
+  NPCs.push({mesh:npc,x,z,name,text,action:action||"eclipse",r:1.2,isEclipse:true});
+  colliders.push({x,z,r:1.2});
+}
+
+const GYM_HOOKS = {
+  1: ()=>{ setMission("Investiga la Ciudad Plateada"); showChapter(2); setTimeout(()=>{ showCutscene([{icon:"🕵️",name:"Ciudadano",text:"¡Ayuda! ¡Unos tipos raros con capas oscuras están merodeando!"},{icon:"🌑",name:"???",text:"<span class='danger'>Team Eclipse</span>... se han llevado Pokémon del Centro."},{icon:"👤",name:"Brendan",text:"¡Tengo que investigar!"}],()=>{ setMission("Encuentra al Team Eclipse"); addEclipseNPC(30,40,"Eclipse Grunt","...","eclipse1"); addEclipseNPC(-30,50,"Eclipse Grunt","...","eclipse1"); }); },3800); },
+  2: ()=>{ setMission("Investiga el robo en Ciudad Celeste"); setTimeout(()=>{ showCutscene([{icon:"🌑",name:"Eclipse Grunt",text:"<span class='danger'>¡Alto ahí, niño!</span> Team Eclipse se lleva lo que quiere."},{icon:"👤",name:"Brendan",text:"¡Devuelvan esos Pokémon!"},{icon:"🌑",name:"Eclipse Grunt",text:"¡Nunca! <span class='danger'>¡Adelante, Houndour!</span>"}],()=>{ startEclipseBattle(1); }); },1500); },
+  4: ()=>{ setMission("El Eclipse tiene una base en alguna parte..."); STORY.flags.eclipseEncounter2 = true; },
+  5: ()=>{ setMission("El Team Eclipse se dirige a Ciudad Azafrán"); setTimeout(()=>{ showCutscene([{icon:"🌑",name:"Eclipse Admin",text:"El <span class='danger'>Jefe</span> quiere a los legendarios."},{icon:"🌑",name:"Eclipse Grunt",text:"¡Invocaremos al <span class='danger'>Guardián del Cielo</span>!"},{icon:"👤",name:"Brendan",text:"¿Guardián del Cielo?... ¡Rayquaza!"}],()=>{ startEclipseBattle(2); }); },1500); },
+  8: ()=>{ setMission("¡La Liga de Kanto Nova te espera!"); },
+  9: ()=>{ setMission("Investiga Aurelia con el Profesor Aurelio"); STORY.flags.aureliaArrived = true; },
+  13: ()=>{ setMission("El Eclipse tiene una base bajo el Monte Celeste"); setTimeout(()=>{ showCutscene([{icon:"🌑",name:"Eclipse Admin",text:"Nuestro <span class='danger'>Jefe</span> activará el Dispositivo Eclipse."},{icon:"👤",name:"Brendan",text:"¡No lo permitiré!"}],()=>{ startEclipseBattle(3); }); },1500); },
+  16: ()=>{ setMission("El Jefe del Eclipse está en la cima"); }
+};
+function onKantoChampionDone(){ STORY.flags.kantoChampionDone = true; showChapter(5); setTimeout(()=>{ showCutscene([{icon:"👨‍🔬",name:"Profesor Oak",text:"¡Brendan! ¡La Liga ha detectado una nueva región al norte!"},{icon:"👨‍🔬",name:"Profesor Oak",text:"Se llama <span class='em'>Aurelia</span>. Pero hay algo más..."},{icon:"👨‍🔬",name:"Profesor Oak",text:"El <span class='danger'>Team Eclipse</span> tiene presencia allí también."},{icon:"👤",name:"Brendan",text:"¡Iré a Aurelia! ¡Los detendré!"}],()=>{ setMission("Viaja a Aurelia en el aeropuerto"); STORY.flags.aureliaArrived = true; }); },3800); }
+function onAureliaChampionDone(){ STORY.flags.aureliaChampionDone = true; showChapter(9); setTimeout(()=>{ showCutscene([{icon:"🌑",name:"Jefe del Eclipse",text:"<span class='danger'>Ja, ja, ja...</span>"},{icon:"🌑",name:"Jefe del Eclipse",text:"Ya tenemos al <span class='danger'>Guardián del Cielo</span> bajo control."},{icon:"👤",name:"Brendan",text:"¡Rayquaza!"},{icon:"🌑",name:"Jefe del Eclipse",text:"Ven al <span class='danger'>Monte Celeste</span>... si te atreves."}],()=>{ setMission("Ve al Monte Celeste"); ZONES.monte_celeste = {name:"Monte Celeste",type:"route",size:{w:120,h:200},exits:{},grass:[{x:-30,z:0,w:40,h:160,min:70,max:80},{x:30,z:0,w:40,h:160,min:70,max:80}],npcs:[{x:0,z:-80,name:"Jefe del Eclipse",color:0x1a1a1a,action:"eclipseBoss",opts:{cap:0x2a0a4a,hair:0x000000,pack:0x2a0a4a}}]}; link("ciudad_endrino","east","monte_celeste"); link("monte_celeste","west","ciudad_endrino"); }); },3800); }
+function startEclipseBattle(level){ const teams = {1:[new Pokemon(228,18),new Pokemon(41,17)],2:[new Pokemon(229,42),new Pokemon(42,40),new Pokemon(24,41)],3:[new Pokemon(229,65),new Pokemon(94,63),new Pokemon(248,64),new Pokemon(89,62)]}; const team = teams[level]; const gym = {id:1000+level,name:"Eclipse Admin",team,megaStone:null,badge:"Insignia Eclipse"}; startBattle("gym",team,gym); battleState.isEclipse = true; battleState.eclipseLevel = level; }
+function onEclipseDefeated(level){ if(level === 1){ STORY.flags.eclipseEncounter1 = true; showDialog("Eclipse Grunt",["¡Maldición! ¡El Jefe no estará contento!"],()=>{ setMission("Sigue tu viaje por Kanto Nova"); }); } else if(level === 2){ STORY.flags.eclipseEncounter2 = true; showDialog("Eclipse Admin",["<span style='color:#ff4444'>¡Esto no ha terminado!</span>","El Team Eclipse regresará más fuerte..."],()=>{ setMission("Continúa tu viaje"); }); } else if(level === 3){ STORY.flags.eclipseBaseDone = true; showDialog("Eclipse Admin",["¡Imposible!","El Jefe... ¡no perdonará esto!"],()=>{ setMission("Sube al Monte Celeste"); }); } }
+function startFinalBossBattle(){ const team = [new Pokemon(229,80),new Pokemon(94,82),new Pokemon(248,84),new Pokemon(445,86),new Pokemon(384,88)]; const gym = {id:2000,name:"Jefe del Eclipse",team,megaStone:"Mewtwoita",badge:"Insignia Eclipse Maestra"}; startBattle("champion",team,gym); battleState.championRegion = "eclipse"; battleState.isFinalBoss = true; }
+function onFinalBossDefeated(){ STORY.flags.rayquazaRescued = true; showChapter(10); setTimeout(()=>{ showCutscene([{icon:"🌑",name:"Jefe del Eclipse",text:"<span class='danger'>¡No... no puede ser!</span>"},{icon:"👤",name:"Brendan",text:"El Team Eclipse termina hoy."},{icon:"🐉",name:"Rayquaza",text:"<span class='em'>¡GRAAAAAH!</span>"},{icon:"🐉",name:"Rayquaza",text:"<span class='em'>... Gracias, humano.</span>"},{icon:"👨‍🔬",name:"Profesor Oak",text:"¡Brendan! ¡Lo lograste! Las dos regiones están a salvo."},{icon:"🌅",name:"Narrador",text:"<span class='em'>POST-GAME DESBLOQUEADO</span>"}],()=>{ setMission("Explora y captura legendarios"); STORY.flags.postGameStarted = true; setTimeout(()=>{ showChapter(11); },500); }); },3800); }
+async function handleSpecialInteract(npc){
+  const action = npc.action;
+  if(action === "eclipse1"){ showCutscene([{icon:"🌑",name:"Eclipse Grunt",text:"¡Lárgate, niño! Team Eclipse no se detiene."},{icon:"👤",name:"Brendan",text:"¡Devuelvan los Pokémon robados!"}],()=>{ startEclipseBattle(1); }); return true; }
+  if(action === "eclipse2"){ showCutscene([{icon:"🌑",name:"Eclipse Admin",text:"Así que tú eres el famoso Brendan..."},{icon:"🌑",name:"Eclipse Admin",text:"<span class='danger'>¡Prepárate!</span>"}],()=>{ startEclipseBattle(2); }); return true; }
+  if(action === "eclipse3"){ showCutscene([{icon:"🌑",name:"Eclipse Admin",text:"¡No te acercarás al Jefe!"}],()=>{ startEclipseBattle(3); }); return true; }
+  if(action === "eclipseBoss"){ showCutscene([{icon:"🌑",name:"Jefe del Eclipse",text:"Así que tú eres el que ha causado tantos problemas..."},{icon:"🌑",name:"Jefe del Eclipse",text:"<span class='danger'>El Rayquaza que ves aquí me obedece.</span>"},{icon:"👤",name:"Brendan",text:"¡Rayquaza, despierta!"},{icon:"🌑",name:"Jefe del Eclipse",text:"<span class='danger'>¡Demasiado tarde!</span>"}],()=>{ startFinalBossBattle(); }); return true; }
+  if(action && action.startsWith("legendary")){ const map = {legendary_articuno:144,legendary_zapdos:145,legendary_moltres:146,legendary_mewtwo:150,legendary_mew:151,legendary_lugia:249,legendary_hooh:250,legendary_celebi:251,legendary_raikou:243,legendary_entei:244,legendary_suicune:245}; const lvlMap = {legendary_articuno:70,legendary_zapdos:70,legendary_moltres:70,legendary_mewtwo:70,legendary_mew:60,legendary_lugia:75,legendary_hooh:75,legendary_celebi:65,legendary_raikou:65,legendary_entei:65,legendary_suicune:65}; if(map[action]){ startBattle("wild",new Pokemon(map[action],lvlMap[action]),null,"Legendario"); return true; } }
+  return false;
+}
+
+function setupControls(){
+  window.addEventListener("keydown",e=>{
+    game.keys[e.key.toLowerCase()] = true;
+    if(e.key===" "||e.key==="Enter"){ if(cutsceneActive){ nextCutsceneLine(); e.preventDefault(); return; } if(dialogEl.style.display==="block"){ advanceDialog(); e.preventDefault(); } }
+    if(e.key.toLowerCase()==="e") tryInteract();
+    if(e.key.toLowerCase()==="p") toggleParty();
+    if(e.key.toLowerCase()==="k") openPokedex();
+  });
+  window.addEventListener("keyup",e=>{ game.keys[e.key.toLowerCase()] = false; });
+  dialogEl.addEventListener("click",()=>advanceDialog());
+  isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || ('ontouchstart' in window && window.innerWidth < 1024);
+  if(isMobile) document.body.classList.add("mobile");
+  const joy = document.getElementById("joystick"),knob = document.getElementById("joystickKnob");
+  let joyId = null,cx=0,cy=0;
+  joy.addEventListener("touchstart",e=>{ const t = e.changedTouches[0]; joyId = t.identifier; const r = joy.getBoundingClientRect(); cx = r.left + r.width/2; cy = r.top + r.height/2; e.preventDefault(); },{passive:false});
+  joy.addEventListener("touchmove",e=>{ for(const t of e.changedTouches){ if(t.identifier!==joyId) continue; const dx = t.clientX - cx,dy = t.clientY - cy; const max = 50,len = Math.min(max,Math.hypot(dx,dy)); const ang = Math.atan2(dy,dx); knob.style.transform = `translate(calc(-50% + ${Math.cos(ang)*len}px), calc(-50% + ${Math.sin(ang)*len}px))`; touchMove.x = (Math.cos(ang)*len)/max; touchMove.y = (Math.sin(ang)*len)/max; e.preventDefault(); } },{passive:false});
+  const endJoy = e=>{ for(const t of e.changedTouches){ if(t.identifier===joyId){ joyId=null; touchMove.x=0; touchMove.y=0; knob.style.transform="translate(-50%,-50%)"; } } };
+  joy.addEventListener("touchend",endJoy); joy.addEventListener("touchcancel",endJoy);
+  const btnA = document.getElementById("btnA"),btnB = document.getElementById("btnB"),btnP = document.getElementById("btnP");
+  const aHandler = ()=>{ if(cutsceneActive){ nextCutsceneLine(); return; } if(dialogEl.style.display==="block") advanceDialog(); else if(game.state==="overworld") tryInteract(); };
+  btnA.addEventListener("touchstart",e=>{ e.preventDefault(); aHandler(); },{passive:false});
+  btnA.addEventListener("click",aHandler);
+  btnB.addEventListener("touchstart",e=>{ e.preventDefault(); if(dialogEl.style.display==="block" || cutsceneActive){ if(cutsceneActive) nextCutsceneLine(); else advanceDialog(); return; } game.keys["shift"] = true; },{passive:false});
+  btnB.addEventListener("touchend",()=>{ game.keys["shift"] = false; });
+  btnB.addEventListener("touchcancel",()=>{ game.keys["shift"] = false; });
+  btnB.addEventListener("click",()=>{ if(dialogEl.style.display==="block"){ advanceDialog(); return; } if(cutsceneActive){ nextCutsceneLine(); return; } });
+  btnP.addEventListener("click",()=>toggleParty());
+  window.addEventListener("wheel",e=>{ if(game.state==="overworld") camDist = Math.max(5,Math.min(14,camDist + e.deltaY*0.01)); },{passive:true});
+  let swipeId = null,swipeStart = null;
+  renderer.domElement.addEventListener("touchstart",e=>{ if(e.target.closest("#joystick, #actionButtons, #battleUI, #dialog, #shop, #pokedex, #pcUI, #cutscene")) return; const t = e.changedTouches[0]; swipeId = t.identifier; swipeStart = {x:t.clientX,y:t.clientY,yaw:camYaw,pitch:camPitch}; },{passive:true});
+  renderer.domElement.addEventListener("touchmove",e=>{ for(const t of e.changedTouches){ if(t.identifier!==swipeId || !swipeStart) continue; const dx = t.clientX - swipeStart.x,dy = t.clientY - swipeStart.y; camYaw = swipeStart.yaw - dx*0.005; camPitch = Math.max(0.1,Math.min(0.85,swipeStart.pitch + dy*0.003)); } },{passive:true});
+  renderer.domElement.addEventListener("touchend",()=>{ swipeId=null; swipeStart=null; });
+}
+
+function updatePlayer(dt){
+  if(game.overworldPaused) return;
+  transitionCooldown = Math.max(0,transitionCooldown - dt);
+  const keys = game.keys; let dx=0,dz=0;
+  if(keys["w"]||keys["arrowup"]) dz -= 1;
+  if(keys["s"]||keys["arrowdown"]) dz += 1;
+  if(keys["a"]||keys["arrowleft"]) dx -= 1;
+  if(keys["d"]||keys["arrowright"]) dx += 1;
+  if(Math.abs(touchMove.x)>0.1 || Math.abs(touchMove.y)>0.1){ const camToX = -Math.sin(camYaw),camToZ = -Math.cos(camYaw); const rightX = Math.cos(camYaw),rightZ = -Math.sin(camYaw); dx += -touchMove.y * camToX + touchMove.x * rightX; dz += -touchMove.y * camToZ + touchMove.x * rightZ; }
+  const len = Math.hypot(dx,dz);
+  const isRunning = keys["shift"] || keys["b"];
+  if(len>0.05){
+    dx/=len; dz/=len;
+    const speed = isRunning ? 20 : 13;
+    const nx = player.position.x + dx*speed*dt,nz = player.position.z + dz*speed*dt;
+    let blocked = false; for(const c of colliders){ if(Math.hypot(nx-c.x,nz-c.z) < c.r + .45){ blocked = true; break; } }
+    if(!blocked){ player.position.x = nx; player.position.z = nz; }
+    const ta = Math.atan2(dx,dz); let diff = ta - player.rotation.y;
+    while(diff > Math.PI) diff -= Math.PI*2; while(diff < -Math.PI) diff += Math.PI*2;
+    player.rotation.y += diff * Math.min(1,dt*14);
+    player.userData.isWalking = true;
+    player.userData.walkPhase += dt * (isRunning ? 20 : 12);
+    const swing = Math.sin(player.userData.walkPhase) * 0.75;
+    player.userData.legL.rotation.x = swing; player.userData.legR.rotation.x = -swing;
+    player.userData.armL.rotation.x = -swing * 0.85; player.userData.armR.rotation.x = swing * 0.85;
+    player.userData.baseY = player.userData.baseY || 0;
+    player.position.y = player.userData.baseY + Math.abs(Math.sin(player.userData.walkPhase)) * 0.06;
+  } else {
+    player.userData.isWalking = false; const s=0.85;
+    player.userData.legL.rotation.x *= s; player.userData.legR.rotation.x *= s;
+    player.userData.armL.rotation.x *= s; player.userData.armR.rotation.x *= s;
+    player.userData.baseY = player.userData.baseY || 0;
+    player.position.y += (player.userData.baseY - player.position.y) * Math.min(1,dt*8);
+  }
+  const camOffset = new THREE.Vector3(Math.sin(camYaw)*camDist,camDist*camPitch + 2.6,Math.cos(camYaw)*camDist);
+  camera.position.lerp(player.position.clone().add(camOffset),Math.min(1,dt*5));
+  const lookAt = player.position.clone(); lookAt.y += 1.9; camera.lookAt(lookAt);
+  checkZoneTransition();
+}
+function checkEncounters(dt){
+  if(game.overworldPaused || game.inInterior || game.state!=="overworld") return;
+  if(Math.random() < dt*0.15){
+    for(const g of grassPatches){
+      if(Math.abs(player.position.x - g.x) < g.w/2 && Math.abs(player.position.z - g.z) < g.h/2){
+        if(Math.random() < 0.5) continue;
+        startWildEncounter(g.minLv,g.maxLv,g.zone); return;
+      }
+    }
+  }
+}
+function tryInteract(){
+  if(game.state!=="overworld" && !game.inInterior) return;
+  const px = player.position.x,pz = player.position.z;
+  if(game.inInterior && interiorState){
+    if(interiorState.type === "gym"){
+      if(Math.hypot(px,pz-10) < 2.5){ exitInterior(); return; }
+      if(Math.hypot(px,pz+7) < 3){ const gym = interiorState.gym; showDialog(gym.name,[`¡Soy ${gym.name}!`,`¡Tipo ${gym.type}!`,"¡Demuéstrame tu fuerza!"],()=>startGymBattle(gym)); return; }
+    } else if(interiorState.type === "center"){
+      if(Math.hypot(px,pz-9) < 2.5){ exitInterior(); return; }
+      if(Math.hypot(px,pz+7.5) < 2.5){ game.player.party.forEach(p=>p.heal()); updatePartyHUD(); showDialog("Enfermera Joy","¡Bienvenido al Centro Pokémon!","¡Tu equipo ha sido curado por completo!"); return; }
+      if(Math.hypot(px+7,pz+7) < 2.5){ openPC(); return; }
+    }
+    return;
+  }
+  for(const n of NPCs){
+    if(Math.hypot(px-n.x,pz-n.z) < 3){
+      if(n.action === "starter") tryChooseStarter();
+      else if(n.action === "championR1") startChampionBattle(1);
+      else if(n.action === "championR2") startChampionBattle(2);
+      else if(n.action && (n.action.startsWith("eclipse") || n.action.startsWith("legendary"))){ handleSpecialInteract(n); }
+      else showDialog(n.name,n.text);
+      return;
+    }
+  }
+  for(const gm of gymMeshes){ if(Math.hypot(px-gm.pos[0],pz-gm.pos[1]) < 6.5){ enterGym(gm.gym); return; } }
+  for(const m of marts){ if(Math.hypot(px-m.x,pz-m.z) < 5.5){ openShop(); return; } }
+  for(const c of centers){ if(Math.hypot(px-c.x,pz-c.z) < 5.5){ enterCenter(c); return; } }
+  for(const a of airports){ if(Math.hypot(px-a.x,pz-a.z) < 12){ if(!game.flags.planeUnlocked){ showDialog("Aeropuerto","Necesitas vencer la Liga de Kanto Nova."); return; } const other = game.player.region === 1 ? 2 : 1; showDialog("Aeropuerto",[other===2?"¿Volar a Aurelia?":"¿Volver a Kanto Nova?"],()=>startPlaneFlight(other)); return; } }
+}
+
+const SHOP_ITEMS = [{id:"balls",name:"Pokéball",desc:"Captura Pokémon salvajes.",price:1,icon:"🔴"},{id:"greatBalls",name:"Super Ball",desc:"Mejor tasa de captura.",price:5,icon:"🔵"},{id:"ultraBalls",name:"Ultra Ball",desc:"Alta tasa de captura.",price:20,icon:"🟡"},{id:"masterBalls",name:"Master Ball",desc:"Captura garantizada.",price:10000,icon:"🟣"},{id:"potions",name:"Poción",desc:"Recupera 50 PS.",price:10,icon:"🧪"},{id:"superPotions",name:"Súper Poción",desc:"Recupera 100 PS.",price:25,icon:"💊"},{id:"hyperPotions",name:"Hiper Poción",desc:"Recupera 200 PS.",price:60,icon:"💉"},{id:"revives",name:"Revivir",desc:"Revive un Pokémon.",price:100,icon:"⚡"},{id:"fireStones",name:"Piedra Fuego",desc:"Evoluciona Pokémon de Fuego.",price:200,icon:"🔥"},{id:"waterStones",name:"Piedra Agua",desc:"Evoluciona Pokémon de Agua.",price:200,icon:"💧"},{id:"thunderStones",name:"Piedra Trueno",desc:"Evoluciona Pokémon Eléctricos.",price:200,icon:"⚡"},{id:"leafStones",name:"Piedra Hoja",desc:"Evoluciona Pokémon de Planta.",price:200,icon:"🍃"}];
+const shopEl = document.getElementById("shop");
+function openShop(){ document.getElementById("shopMoney").textContent = game.player.money; renderShop(); shopEl.style.display="flex"; game.overworldPaused=true; }
+function closeShop(){ shopEl.style.display="none"; game.overworldPaused=false; }
+function renderShop(){
+  const list = document.getElementById("shopItems"); list.innerHTML = "";
+  SHOP_ITEMS.forEach(it=>{ const row = document.createElement("div"); row.className = "shopItem"; const count = game.player[it.id] || 0; row.innerHTML = `<div class="icon">${it.icon}</div><div class="info"><div class="name">${it.name} <span style="color:#7cff7c;font-size:12px">x${count}</span></div><div class="desc">${it.desc}</div><div class="price">₽ ${it.price}</div></div><button data-id="${it.id}" ${game.player.money<it.price?"disabled":""}>Comprar</button>`; list.appendChild(row); });
+  list.querySelectorAll("button").forEach(b=>{ b.onclick = ()=>{ const id = b.dataset.id,item = SHOP_ITEMS.find(x=>x.id===id); if(game.player.money >= item.price){ game.player.money -= item.price; game.player[id] = (game.player[id]||0)+1; document.getElementById("shopMoney").textContent = game.player.money; updateHUD(); renderShop(); autoSave(); } }; });
+}
+document.getElementById("shopClose").onclick = closeShop;
+
+const pcUIEl = document.getElementById("pcUI");
+function openPC(){ pcUIEl.style.display = "flex"; game.overworldPaused = true; renderPC(); }
+function closePC(){ pcUIEl.style.display = "none"; game.overworldPaused = false; autoSave(); }
+function renderPC(){
+  const partyList = document.getElementById("pcPartyList"), boxList = document.getElementById("pcBoxList");
+  document.getElementById("pcPartyCount").textContent = game.player.party.length;
+  document.getElementById("pcBoxCount").textContent = game.player.box.length;
+  partyList.innerHTML = ""; boxList.innerHTML = "";
+  if(game.player.party.length === 0) partyList.innerHTML = '<div class="pcEmpty">Equipo vacío</div>';
+  else game.player.party.forEach((p,idx)=>{ const row = document.createElement("div"); row.className = "pcMon"; row.innerHTML = `<img src="${p.isShiny?SPRITE_SHINY(p.dexId):SPRITE(p.dexId)}"><div class="pcInfo"><div class="pcName">${p.species}${p.isShiny?" ✨":""}</div><div class="pcLvl">Nv.${p.level} · ${p.hp}/${p.maxHp} PS</div></div>`; if(game.player.party.length > 1) row.onclick = ()=>{ if(confirm(`¿Guardar a ${p.species} en el PC?`)){ game.player.box.push(p); game.player.party.splice(idx,1); renderPC(); updatePartyHUD(); autoSave(); resetFollowingPokemon(); setTimeout(()=>updateFollowingPokemon(0.01),100); } }; partyList.appendChild(row); });
+  if(game.player.box.length === 0) boxList.innerHTML = '<div class="pcEmpty">Caja vacía</div>';
+  else game.player.box.forEach((p,idx)=>{ const row = document.createElement("div"); row.className = "pcMon"; row.innerHTML = `<img src="${p.isShiny?SPRITE_SHINY(p.dexId):SPRITE(p.dexId)}"><div class="pcInfo"><div class="pcName">${p.species}${p.isShiny?" ✨":""}</div><div class="pcLvl">Nv.${p.level} · ${p.hp}/${p.maxHp} PS</div></div>`; row.onclick = ()=>{ if(game.player.party.length >= 6){ showDialog("PC","¡Tu equipo ya tiene 6 Pokémon!"); return; } game.player.party.push(p); game.player.box.splice(idx,1); renderPC(); updatePartyHUD(); autoSave(); resetFollowingPokemon(); setTimeout(()=>updateFollowingPokemon(0.01),100); }; boxList.appendChild(row); });
+}
+document.getElementById("pcClose").onclick = closePC;
+
+function startPlaneFlight(toRegion){
+  dialogEl.style.display = "none"; game.overworldPaused = true;
+  const overlay = document.getElementById("planeTransition");
+  document.getElementById("planeText").textContent = toRegion===2 ? "Volando a Aurelia..." : "Volviendo a Kanto Nova...";
+  overlay.style.display = "flex";
+  setTimeout(()=>{ overlay.style.display = "none"; game.player.region = toRegion; transitionToZone(toRegion === 2 ? "pueblo_boreal" : "pueblo_inicio","south"); setTimeout(()=>{ player.position.set(0,0,60); },800); showRegion(toRegion===2 ? "REGIÓN 2: AURELIA" : "REGIÓN 1: KANTO NOVA"); },4200);
+}
+
+const dialogEl = document.getElementById("dialog");
+const dialogName = dialogEl.querySelector(".name");
+const dialogText = dialogEl.querySelector(".text");
+let dialogQueue = [],dialogCallback = null;
+function showDialog(name,text,cb){ dialogQueue = Array.isArray(text) ? text.slice() : [text]; dialogCallback = cb || null; dialogEl.style.display = "block"; game.overworldPaused = true; dialogName.textContent = name; dialogText.textContent = dialogQueue.shift(); }
+function advanceDialog(){ if(dialogQueue.length>0){ dialogText.textContent = dialogQueue.shift(); return; } dialogEl.style.display = "none"; game.overworldPaused = false; const cb = dialogCallback; dialogCallback = null; if(cb) cb(); }
+function showLoading(text,ms){ const el = document.getElementById("loading2"); document.getElementById("loading2text").textContent = text; el.style.display = "flex"; setTimeout(()=>{ el.style.display = "none"; },ms); }
+
+function tryChooseStarter(){ if(game.flags.starter){ showDialog("Profesor Oak","¡Cuida bien a tu Pokémon!"); return; } showDialog("Profesor Oak",["¡Brendan! Bienvenido al mundo Pokémon.","Elige tu compañero."],()=>showStarterMenu()); }
+function showStarterMenu(){
+  const wrap = document.createElement("div"); wrap.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:100;display:flex;align-items:center;justify-content:center;gap:20px;flex-wrap:wrap;padding:20px";
+  [{id:1,name:"Bulbasaur",type:"Planta"},{id:4,name:"Charmander",type:"Fuego"},{id:7,name:"Squirtle",type:"Agua"}].forEach(s=>{
+    const card = document.createElement("div"); card.style.cssText = "background:linear-gradient(180deg,#2a3a5a,#0a0a1a);border:4px solid #ffd700;border-radius:20px;padding:20px;cursor:pointer;text-align:center;color:#fff;min-width:150px";
+    card.innerHTML = `<img src="${SPRITE(s.id)}" style="width:120px;height:120px;image-rendering:pixelated"><div style="font-size:20px;font-weight:bold;color:#ffd700">${s.name}</div><div style="font-size:14px">Tipo ${s.type}</div>`;
+    card.onclick = ()=>{ document.body.removeChild(wrap); game.player.party.push(new Pokemon(s.id,5)); game.flags.starter = true; game.player.caught.add(s.id); game.player.seen.add(s.id); game.player.megaStones.push("Mega Anillo"); updateHUD(); updatePartyHUD(); setTimeout(()=>updateFollowingPokemon(0.01),100); showDialog("Profesor Oak",[`¡Has elegido a ${s.name}!`,"Vence los 8 gimnasios de Kanto Nova.","Al vencer la Liga, descubrirás una nueva región."],()=>{ autoSave(); showChapter(1); setTimeout(()=>{ setMission("Vence a Brock en Ciudad Plateada"); },3800); }); };
+    wrap.appendChild(card);
+  });
+  document.body.appendChild(wrap);
+}
+
+const battleEl = document.getElementById("battle");
+const enemySprite = document.getElementById("enemySprite");
+const playerSprite = document.getElementById("playerSprite");
+const enemyNameEl = document.getElementById("enemyName");
+const enemyLvlEl = document.getElementById("enemyLvl");
+const enemyHpFill = document.getElementById("enemyHpFill");
+const playerBName = document.getElementById("playerBName");
+const playerBLvl = document.getElementById("playerBLvl");
+const playerHpFill = document.getElementById("playerHpFill");
+const playerHpText = document.getElementById("playerHpText");
+const playerXpFill = document.getElementById("playerXpFill");
+const battleMsg = document.getElementById("battleMsg");
+const moveList = document.getElementById("moveList");
+const megaBtn = document.getElementById("megaBtn");
+const potionBtn = document.getElementById("potionBtn");
+const ballBtn = document.getElementById("ballBtn");
+const runBtn = document.getElementById("runBtn");
+let battleState = null;
+
+function startWildEncounter(minLv,maxLv,zoneName){
+  const pool = Object.keys(DEX).map(Number).filter(id => { if([144,145,146,150,151,243,244,245,249,250,251,380,381,384].includes(id)) return false; return DEX[id].stats[0] < 100; });
+  const species = pool[Math.floor(Math.random()*pool.length)];
+  const level = minLv + Math.floor(Math.random()*(maxLv-minLv+1));
+  const mon = new Pokemon(species,level);
+  if(Math.random() < 1/512){ mon.isShiny = true; showRegion("✨ ¡SHINY! ✨"); }
+  startBattle("wild",mon,null,zoneName);
+}
+function startGymBattle(gym){ const team = gym.team.map(t=>new Pokemon(t.id,t.lv)); startBattle("gym",team,gym); }
+function startBattle(kind,mons,gym,zoneName){
+  game.state = "battle"; game.overworldPaused = true;
+  const firstPlayer = game.player.party.find(p=>p.hp>0);
+  if(!firstPlayer){ showDialog("Emergencia","¡Todos tus Pokémon están debilitados!"); game.state="overworld"; game.overworldPaused=false; return; }
+  battleState = {kind,gym,zoneName,enemyTeam:Array.isArray(mons)?mons:[mons],enemyIdx:0,playerIdx:game.player.party.indexOf(firstPlayer),turn:"player",busy:false,playerCanMega:true};
+  battleEl.style.display = "block"; updateBattleUI();
+  battleState.enemyTeam.forEach(e=>game.player.seen.add(e.dexId));
+  const enemy = currentEnemy();
+  if(enemy.isShiny) battleMsg.textContent = `✨ ¡Un ${enemy.species} SHINY apareció! ✨`;
+  else battleMsg.textContent = kind==="gym" ? `${gym.name} envió a ${enemy.species}!` : `¡Un ${enemy.species} salvaje (Nv.${enemy.level}) apareció!`;
+  setTimeout(renderMoves,400);
+  if(musicEnabled){ stopMusicLoop(); startMusicLoop(); }
+}
+function currentEnemy(){ return battleState.enemyTeam[battleState.enemyIdx]; }
+function currentPlayer(){ return game.player.party[battleState.playerIdx]; }
+function updateBattleUI(){
+  const enemy = currentEnemy(),p = currentPlayer();
+  enemySprite.src = enemy.isShiny ? SPRITE_SHINY(enemy.dexId) : SPRITE(enemy.dexId);
+  playerSprite.src = p.isShiny ? BACK_SHINY(p.dexId) : BACK(p.dexId);
+  enemySprite.classList.toggle("mega",enemy.mega && !enemy.isShiny);
+  enemySprite.classList.toggle("shiny",enemy.isShiny);
+  playerSprite.classList.toggle("mega",p.mega && !p.isShiny);
+  playerSprite.classList.toggle("shiny",p.isShiny);
+  enemyNameEl.textContent = enemy.species + (enemy.isShiny?" ✨":"") + (enemy.mega?" (Mega)":"");
+  enemyLvlEl.textContent = "Nv." + enemy.level;
+  playerBName.textContent = p.species + (p.isShiny?" ✨":"") + (p.mega?" (Mega)":"");
+  playerBLvl.textContent = "Nv." + p.level;
+  updateHpBars();
+  const stone = MEGA_STONES[p.dexId];
+  if(stone && game.player.megaStones.includes(stone) && !p.mega && battleState.playerCanMega && p.megaData){ megaBtn.style.display = "block"; megaBtn.textContent = "⚡ MEGA " + p.species.toUpperCase(); } else megaBtn.style.display = "none";
+  potionBtn.textContent = `🧪 Poción (${game.player.potions})`;
+  const totalBalls = game.player.balls + game.player.greatBalls + game.player.ultraBalls + game.player.masterBalls;
+  ballBtn.textContent = `🔴 Balls (${totalBalls})`;
+}
+function updateHpBars(){
+  const enemy = currentEnemy(),p = currentPlayer();
+  const eR = enemy.hp/enemy.maxHp; enemyHpFill.style.width = Math.max(0,eR*100)+"%"; enemyHpFill.className = "hp-fill " + (eR<.2?"crit":eR<.5?"warn":"");
+  const pR = p.hp/p.maxHp; playerHpFill.style.width = Math.max(0,pR*100)+"%"; playerHpFill.className = "hp-fill " + (pR<.2?"crit":pR<.5?"warn":"");
+  playerHpText.textContent = `${Math.max(0,p.hp)} / ${p.maxHp}`;
+  const xpNeeded = xpForLevel(p.level+1); playerXpFill.style.width = Math.min(100,(p.xp/xpNeeded)*100) + "%";
+  updatePartyHUD();
+}
+function renderMoves(){ moveList.innerHTML = ""; const p = currentPlayer(); p.moves.forEach((mn,i)=>{ const mv = MOVES[mn] || {type:"Normal",power:40}; const b = document.createElement("button"); b.className = "moveBtn"; b.disabled = battleState.busy || battleState.turn!=="player" || p.movePP[i]<=0; b.innerHTML = `${mn}<span class="mtype">${mv.type} · Poder ${mv.power||"—"} · PP ${p.movePP[i]}/20</span>`; b.onclick = ()=>playerUseMove(i); moveList.appendChild(b); }); }
+async function playerUseMove(idx){
+  if(battleState.busy) return; battleState.busy = true;
+  const p = currentPlayer(),enemy = currentEnemy();
+  const mvName = p.moves[idx],mv = MOVES[mvName] || {type:"Normal",power:40};
+  p.movePP[idx]--; battleMsg.textContent = `¡${p.species} usó ${mvName}!`;
+  renderMoves(); await sleep(700);
+  if(mv.status==="sleep"){ if(Math.random()<0.7){ enemy.status="sleep"; enemy.statusTurns=2; battleMsg.textContent = `¡${enemy.species} se durmió!`; } else battleMsg.textContent = "¡Falló!"; }
+  else if(mv.status==="paralyze"){ if(Math.random()<0.8){ enemy.status="paralyze"; battleMsg.textContent=`¡${enemy.species} fue paralizado!`; } else battleMsg.textContent="¡Falló!"; }
+  else if(mv.status==="poison"){ enemy.status="poison"; enemy.statusTurns=3; battleMsg.textContent = `¡${enemy.species} fue envenenado!`; }
+  else if(mv.status==="burn"){ enemy.status="burn"; enemy.statusTurns=3; battleMsg.textContent = `¡${enemy.species} fue quemado!`; }
+  else if(mv.status==="boost"){ p.statStages.atk=Math.min(6,p.statStages.atk+1); p.statStages.spa=Math.min(6,p.statStages.spa+1); battleMsg.textContent = `¡Ataque de ${p.species} subió!`; }
+  else { const dmg = calcDamage(p,enemy,mv); enemy.hp -= dmg.dmg; updateHpBars(); if(dmg.eff>1) battleMsg.textContent = "¡Es súper eficaz!"; else if(dmg.eff<1 && dmg.eff>0) battleMsg.textContent = "No es muy eficaz..."; else if(dmg.eff===0) battleMsg.textContent = "No afecta..."; }
+  await sleep(900);
+  if(enemy.hp<=0){ await handleEnemyFaint(); return; }
+  if(enemy.status==="poison"){ enemy.hp -= Math.floor(enemy.maxHp/16); updateHpBars(); battleMsg.textContent = `${enemy.species} sufre por el veneno.`; await sleep(700); if(enemy.hp<=0){ await handleEnemyFaint(); return; } }
+  if(enemy.status==="burn"){ enemy.hp -= Math.floor(enemy.maxHp/16); updateHpBars(); battleMsg.textContent = `${enemy.species} sufre por la quemadura.`; await sleep(700); if(enemy.hp<=0){ await handleEnemyFaint(); return; } }
+  await enemyTurn();
+}
+async function enemyTurn(){
+  battleState.busy = true;
+  const enemy = currentEnemy(),p = currentPlayer();
+  if(enemy.status==="sleep"){ enemy.statusTurns--; if(enemy.statusTurns<=0) enemy.status=null; battleMsg.textContent = `${enemy.species} está dormido...`; await sleep(900); }
+  else if(enemy.status==="paralyze" && Math.random()<0.25){ battleMsg.textContent = `${enemy.species} está paralizado.`; await sleep(900); }
+  else { const mv = enemy.moves[Math.floor(Math.random()*enemy.moves.length)]; const mvD = MOVES[mv] || {type:"Normal",power:40}; battleMsg.textContent = `¡${enemy.species} usó ${mv}!`; await sleep(700); if(mvD.power>0){ const dmg = calcDamage(enemy,p,mvD); p.hp -= dmg.dmg; updateHpBars(); if(dmg.eff>1) battleMsg.textContent = "¡Es súper eficaz!"; else if(dmg.eff<1 && dmg.eff>0) battleMsg.textContent = "No es muy eficaz..."; else if(dmg.eff===0) battleMsg.textContent = "No afecta..."; await sleep(800); } }
+  if(p.hp<=0){ await handlePlayerFaint(); return; }
+  battleState.busy = false; battleState.turn = "player"; renderMoves();
+}
+async function handleEnemyFaint(){
+  if(battleState.kind==="champion") return handleChampionFaint();
+  battleMsg.textContent = `¡${currentEnemy().species} se debilitó!`; await sleep(1000);
+  const xpGain = Math.floor(currentEnemy().level * 15 + 20);
+  const p = currentPlayer(); const events = p.gainXP(xpGain);
+  battleMsg.textContent = `¡${p.species} ganó ${xpGain} XP!`; updateHpBars(); updatePartyHUD(); await sleep(1200);
+  for(const ev of events){ if(ev.type === "levelup"){ battleMsg.textContent = `¡${p.species} subió al nivel ${ev.level}!`; updateHpBars(); updatePartyHUD(); await sleep(1300); } else if(ev.type === "forgot"){ battleMsg.textContent = `${p.species} olvidó ${ev.move}...`; await sleep(1300); } else if(ev.type === "move"){ battleMsg.textContent = `¡${p.species} aprendió ${ev.move}!`; await sleep(1500); } }
+  renderMoves();
+  if(p.pendingEvolution){ const targetId = p.pendingEvolution; p.pendingEvolution = null; await sleep(600); await showEvolutionCutscene(p,targetId); }
+  battleState.enemyIdx++;
+  if(battleState.enemyIdx >= battleState.enemyTeam.length){
+    if(battleState.kind==="gym"){
+      if(battleState.isEclipse){ endBattle(); autoSave(); onEclipseDefeated(battleState.eclipseLevel); return; }
+      const gym = battleState.gym; game.player.defeated.add(gym.id); game.player.badges++; game.player.money += 2000;
+      if(gym.megaStone && !game.player.megaStones.includes(gym.megaStone)) game.player.megaStones.push(gym.megaStone);
+      updateHUD(); battleMsg.textContent = `¡Venciste a ${gym.name}! Ganaste la ${gym.badge}.`; await sleep(1500);
+      if(gym.megaStone){ battleMsg.textContent = `¡Obtuviste la ${gym.megaStone}!`; await sleep(1800); }
+      game.player.party.forEach(p=>{ if(p.hp>0) p.hp = Math.min(p.maxHp,p.hp + Math.floor(p.maxHp*0.3)); });
+      if(GYM_HOOKS[gym.id]){ setTimeout(()=>{ endBattle(); exitInterior(); autoSave(); GYM_HOOKS[gym.id](); },1500); return; }
+      setTimeout(()=>{ endBattle(); exitInterior(); autoSave(); },1500);
+    } else { game.player.money += 100; updateHUD(); await sleep(1000); endBattle(); }
+  } else { updateBattleUI(); battleMsg.textContent = `${battleState.gym.name} envió a ${currentEnemy().species}!`; await sleep(1000); battleState.busy = false; battleState.turn = "player"; renderMoves(); }
+}
+async function handleChampionFaint(){
+  battleMsg.textContent = `¡${currentEnemy().species} se debilitó!`; await sleep(1000);
+  if(battleState.isFinalBoss){ battleState.enemyIdx++; if(battleState.enemyIdx >= battleState.enemyTeam.length){ endBattle(); onFinalBossDefeated(); return; } updateBattleUI(); battleMsg.textContent = `Jefe del Eclipse envió a ${currentEnemy().species}!`; await sleep(1000); battleState.busy = false; battleState.turn = "player"; renderMoves(); return; }
+  const p = currentPlayer(); p.gainXP(500); updatePartyHUD();
+  battleState.enemyIdx++;
+  if(battleState.enemyIdx >= battleState.enemyTeam.length){
+    if(battleState.championRegion === 1){ game.flags.championR1 = true; game.flags.planeUnlocked = true; game.player.money += 5000; updateHUD(); battleMsg.textContent = "¡Venciste a la Liga de Kanto Nova!"; await sleep(2000); endBattle(); setTimeout(()=>{ onKantoChampionDone(); autoSave(); },500); }
+    else { game.flags.championR2 = true; game.player.badges = 16; game.player.money += 10000; if(!game.player.megaStones.includes("Mewtwoita")) game.player.megaStones.push("Mewtwoita"); updateHUD(); battleMsg.textContent = "¡Venciste al Campeón de Aurelia!"; await sleep(2000); endBattle(); setTimeout(()=>{ onAureliaChampionDone(); autoSave(); },500); }
+  } else { updateBattleUI(); battleMsg.textContent = `Campeón envió a ${currentEnemy().species}!`; await sleep(1000); battleState.busy = false; battleState.turn = "player"; renderMoves(); }
+}
+async function handlePlayerFaint(){ const p = currentPlayer(); battleMsg.textContent = `¡${p.species} se debilitó!`; await sleep(1000); const alive = game.player.party.findIndex(x=>x.hp>0); if(alive<0){ battleMsg.textContent = "¡No te quedan Pokémon! Regresando..."; await sleep(1800); game.player.party.forEach(x=>x.heal()); endBattle(); if(game.inInterior) exitInterior(); return; } battleState.playerIdx = alive; updateBattleUI(); battleState.busy=false; battleState.turn="player"; renderMoves(); }
+function calcDamage(attacker,defender,mv){ const isSpecial = ["Fire","Water","Grass","Electric","Ice","Psychic","Dragon","Dark","Fairy"].includes(mv.type); const atkStat = isSpecial ? attacker.stats[3] : attacker.stats[1]; const defStat = isSpecial ? defender.stats[4] : defender.stats[2]; const atkMul = 1 + attacker.statStages.atk*0.5; const stab = attacker.types.includes(mv.type) ? 1.5 : 1; let eff = 1; const chart = TYPE_CHART[mv.type] || {}; defender.types.forEach(t => {eff *= chart[t] ?? 1;}); const rand = 0.85 + Math.random()*0.15; const dmg = Math.floor((((2*attacker.level/5+2)*mv.power*atkStat*atkMul/defStat)/50 + 2) * stab * eff * rand); return {dmg:Math.max(1,dmg),eff}; }
+megaBtn.onclick = ()=>{ if(battleState.busy) return; const p = currentPlayer(); if(p.megaEvolve()){ battleState.playerCanMega = false; updateBattleUI(); battleMsg.textContent = `¡${p.species} MEGA EVOLUCIONÓ!`; createMegaParticles(playerSprite); setTimeout(()=>{battleState.busy=false; renderMoves();},1200); } };
+function createMegaParticles(img){ const rect = img.getBoundingClientRect(); for(let i=0;i<30;i++){ const p = document.createElement("div"); p.style.cssText = `position:fixed;width:12px;height:12px;border-radius:50%;background:${Math.random()<.5?'#ff00ff':'#00ffff'};left:${rect.left+rect.width/2}px;top:${rect.top+rect.height/2}px;box-shadow:0 0 20px currentColor;pointer-events:none;z-index:200;transition:all 1s cubic-bezier(.2,.8,.3,1)`; document.body.appendChild(p); const a = Math.random()*Math.PI*2,d = 100+Math.random()*200; requestAnimationFrame(()=>{p.style.transform = `translate(${Math.cos(a)*d}px, ${Math.sin(a)*d}px) scale(0)`; p.style.opacity = 0;}); setTimeout(()=>p.remove(),1100); } }
+potionBtn.onclick = ()=>{ if(battleState.busy || battleState.turn!=="player") return; if(game.player.potions<=0){ battleMsg.textContent = "¡No tienes Pociones!"; return; } game.player.potions--; const p = currentPlayer(); p.hp = Math.min(p.maxHp,p.hp + 50); updateHpBars(); updateBattleUI(); battleMsg.textContent = `${p.species} recuperó 50 PS!`; battleState.busy = true; setTimeout(enemyTurn,900); };
+ballBtn.onclick = ()=>{
+  if(battleState.busy || battleState.turn!=="player") return;
+  if(battleState.kind!=="wild"){ battleMsg.textContent = "¡No puedes capturar Pokémon de entrenadores!"; return; }
+  let ballType = "balls", ballName = "Pokéball", ballMult = 1;
+  if(game.player.masterBalls > 0){ ballType = "masterBalls"; ballName = "Master Ball"; ballMult = 255; }
+  else if(game.player.ultraBalls > 0){ ballType = "ultraBalls"; ballName = "Ultra Ball"; ballMult = 2; }
+  else if(game.player.greatBalls > 0){ ballType = "greatBalls"; ballName = "Super Ball"; ballMult = 1.5; }
+  if(game.player[ballType] <= 0){ battleMsg.textContent = "¡No tienes Pokéballs!"; return; }
+  if(game.player.party.length >= 6 && game.player.box.length >= 30){ battleMsg.textContent = "¡PC lleno!"; return; }
+  game.player[ballType]--;
+  updateBattleUI();
+  const enemy = currentEnemy();
+  const rate = Math.min(0.95, ((1 - enemy.hp/enemy.maxHp)*0.8 + 0.1) * ballMult);
+  battleMsg.textContent = `¡Lanzaste una ${ballName}!`;
+  battleState.busy = true;
+  setTimeout(()=>{
+    if(Math.random() < rate){
+      battleMsg.textContent = `¡Atrapaste a ${enemy.species}${enemy.isShiny?" ✨":""}!`;
+      game.player.caught.add(enemy.dexId); game.player.seen.add(enemy.dexId);
+      if(game.player.party.length < 6) game.player.party.push(enemy);
+      else { game.player.box.push(enemy); battleMsg.textContent += " Enviado al PC."; }
+      updatePartyHUD(); checkPokedexRewards(); autoSave(); resetFollowingPokemon(); setTimeout(()=>updateFollowingPokemon(0.01),100);
+      setTimeout(endBattle,1500);
+    } else {
+      battleMsg.textContent = `¡${enemy.species} escapó!`;
+      setTimeout(enemyTurn,900);
+    }
+  },1000);
+};
+runBtn.onclick = ()=>{ if(battleState.busy) return; if(battleState.kind==="gym"||battleState.kind==="champion"){ battleMsg.textContent = "¡No puedes huir!"; return; } if(Math.random()<0.7){ battleMsg.textContent = "¡Escapaste!"; setTimeout(endBattle,800); } else { battleMsg.textContent = "¡No pudiste escapar!"; battleState.busy = true; setTimeout(enemyTurn,800); } };
+function endBattle(){ battleEl.style.display="none"; game.state="overworld"; game.overworldPaused=false; battleState=null; updateHUD(); updatePartyHUD(); if(musicEnabled){ stopMusicLoop(); startMusicLoop(); } resetFollowingPokemon(); setTimeout(()=>updateFollowingPokemon(0.01),100); }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+async function showEvolutionCutscene(pokemon,targetId){
+  const evoEl = document.getElementById("evolution"), imgEl = document.getElementById("evoImg"), msgEl = document.getElementById("evoMsg"), flashEl = document.getElementById("evoFlash");
+  const oldId = pokemon.dexId, oldName = pokemon.species, newName = DEX[targetId].name;
+  evoEl.style.display = "flex"; imgEl.src = pokemon.isShiny ? SPRITE_SHINY(oldId) : SPRITE(oldId); imgEl.style.transform = "scale(1)";
+  msgEl.textContent = `¿Qué? ¡${oldName} está evolucionando!`;
+  await sleep(1500);
+  for(let i=0;i<4;i++){ flashEl.style.opacity = 0.8; imgEl.style.transform = "scale(1.1)"; await sleep(200); flashEl.style.opacity = 0; imgEl.style.transform = "scale(1)"; await sleep(200); if(i === 1) imgEl.src = pokemon.isShiny ? SPRITE_SHINY(targetId) : SPRITE(targetId); }
+  pokemon.dexId = targetId; pokemon.species = newName; pokemon.types = DEX[targetId].types.slice(); pokemon.megaData = DEX[targetId].mega || null;
+  const ratio = pokemon.hp / pokemon.maxHp; pokemon.stats = pokemon.calcStats(DEX[targetId].stats); pokemon.maxHp = pokemon.stats[0]; pokemon.hp = Math.max(1,Math.floor(pokemon.maxHp * ratio));
+  pokemon.moves = getMovesForLevel(targetId,pokemon.level); pokemon.movePP = pokemon.moves.map(()=>20);
+  game.player.caught.add(targetId); game.player.seen.add(targetId);
+  msgEl.textContent = `¡Felicidades! ¡${oldName} evolucionó a ${newName}!`;
+  createMegaParticles(imgEl); await sleep(2500); evoEl.style.display = "none"; updatePartyHUD(); autoSave(); resetFollowingPokemon(); setTimeout(()=>updateFollowingPokemon(0.01),100);
+}
+
+function startChampionBattle(region){ const team = region===1 ? [new Pokemon(143,55),new Pokemon(149,57),new Pokemon(248,58),new Pokemon(445,60),new Pokemon(384,62)] : [new Pokemon(143,85),new Pokemon(149,87),new Pokemon(248,88),new Pokemon(445,90),new Pokemon(384,95)]; const gym = {id:99+region,name:"Campeón"+(region===1?" R1":" R2"),team,megaStone:"Mewtwoita",badge:"Medalla Legendaria"}; startBattle("champion",team,gym); battleState.championRegion = region; }
+function createPlayer(){ player = createHumanoid({shirt:0x1a1a1a,vest:0xd22a2a,pants:0x2a3a5c,shoe:0x111111,hair:0x3a2418,skin:0xf5c9a0,cap:0xe83030,capBand:0xffffff,pack:0xcc2222}); scene.add(player); player.userData.baseY = 0; }
+
+const ALL_DEX_IDS = Object.keys(DEX).map(Number).sort((a,b)=>a-b);
+let pdexFilter = "all";
+function checkPokedexRewards(){
+  const caught = game.player.caught.size;
+  if(!game.player.reward10 && caught >= 10){ game.player.reward10 = true; game.player.money += 1000; showDialog("Profesor Oak",["¡Has capturado 10 Pokémon!","Aquí tienes ₽1000 como recompensa."]); }
+  if(!game.player.reward50 && caught >= 50){ game.player.reward50 = true; game.player.money += 5000; game.player.masterBalls += 1; showDialog("Profesor Oak",["¡Has capturado 50 Pokémon!","Aquí tienes ₽5000 y una Master Ball."]); }
+  if(!game.player.reward100 && caught >= 100){ game.player.reward100 = true; game.player.money += 20000; showDialog("Profesor Oak",["¡Has capturado 100 Pokémon!","¡Increíble! Aquí tienes ₽20000."]); }
+  updateHUD();
+}
+function openPokedex(){ document.getElementById("pokedex").style.display = "flex"; game.overworldPaused = true; renderPokedex(); }
+function closePokedex(){ document.getElementById("pokedex").style.display = "none"; game.overworldPaused = false; }
+function renderPokedex(){
+  const grid = document.getElementById("pdexGrid"); grid.innerHTML = "";
+  document.getElementById("dexSeen").textContent = game.player.seen.size;
+  document.getElementById("dexCaught").textContent = game.player.caught.size;
+  document.getElementById("dexTotal").textContent = ALL_DEX_IDS.length;
+  ALL_DEX_IDS.forEach(id=>{ const caught = game.player.caught.has(id), seen = game.player.seen.has(id); if(pdexFilter === "caught" && !caught) return; if(pdexFilter === "seen" && !seen && !caught) return; const d = DEX[id]; const cell = document.createElement("div"); cell.className = "pdex-cell" + (caught?" caught":(!seen?" locked":"")); const num = String(id).padStart(3,"0"); if(seen || caught) cell.innerHTML = `<div class="pdex-num">#${num}</div><img src="${SPRITE(id)}"><div class="pdex-name">${d.name}</div>`; else cell.innerHTML = `<div class="pdex-num">#${num}</div><img src="${SPRITE(id)}"><div class="pdex-name">???</div>`; cell.onclick = ()=>{ if(caught || seen) showDialog("Pokédex #"+num,[`${d.name}`,`Tipo: ${d.types.join(" / ")}`,`PS: ${d.stats[0]} · Atk: ${d.stats[1]} · Def: ${d.stats[2]}`,`AtEsp: ${d.stats[3]} · DefEsp: ${d.stats[4]} · Vel: ${d.stats[5]}`]); else showDialog("Pokédex #"+num,"Aún no has visto este Pokémon."); }; grid.appendChild(cell); });
+}
+document.getElementById("pdexClose").onclick = closePokedex;
+document.querySelectorAll(".pdex-filter").forEach(b=>{ b.onclick = ()=>{ document.querySelectorAll(".pdex-filter").forEach(x=>x.classList.remove("active")); b.classList.add("active"); pdexFilter = b.dataset.filter; renderPokedex(); }; });
+document.getElementById("dexBtn").onclick = openPokedex;
+
+const SAVE_KEY = "pokemon_regiones_gemelas_v5";
+function saveGame(){ try{ const data = {version:5,timestamp:Date.now(),player:{name:game.player.name,badges:game.player.badges,money:game.player.money,megaStones:game.player.megaStones,potions:game.player.potions,balls:game.player.balls,greatBalls:game.player.greatBalls,ultraBalls:game.player.ultraBalls,masterBalls:game.player.masterBalls,superPotions:game.player.superPotions,hyperPotions:game.player.hyperPotions,revives:game.player.revives,fireStones:game.player.fireStones,waterStones:game.player.waterStones,thunderStones:game.player.thunderStones,leafStones:game.player.leafStones,region:game.player.region,seen:[...game.player.seen],caught:[...game.player.caught],defeated:[...game.player.defeated],tms:game.player.tms,reward10:game.player.reward10,reward50:game.player.reward50,reward100:game.player.reward100},flags:{...game.flags},story:{chapter:STORY.chapter,flags:{...STORY.flags},mission:STORY.mission},zoneId:currentZoneId,playerPos:{x:player.position.x,y:player.position.y,z:player.position.z,yaw:player.rotation.y,camYaw,camPitch,camDist},party:game.player.party.map(p=>({dexId:p.dexId,level:p.level,xp:p.xp,hp:p.hp,moves:p.moves.slice(),movePP:p.movePP.slice(),mega:p.mega,isShiny:p.isShiny})),box:game.player.box.map(p=>({dexId:p.dexId,level:p.level,xp:p.xp,hp:p.hp,moves:p.moves.slice(),movePP:p.movePP.slice(),mega:p.mega,isShiny:p.isShiny}))}; localStorage.setItem(SAVE_KEY,JSON.stringify(data)); showSaveNotify(); } catch(e){ console.warn("Error guardando:",e); } }
+function loadGame(){
+  try{ const raw = localStorage.getItem(SAVE_KEY); if(!raw) return false; const data = JSON.parse(raw); if(!data) return false;
+    Object.assign(game.player,{name:data.player.name,badges:data.player.badges,money:data.player.money,megaStones:data.player.megaStones||[],potions:data.player.potions||0,balls:data.player.balls||0,greatBalls:data.player.greatBalls||0,ultraBalls:data.player.ultraBalls||0,masterBalls:data.player.masterBalls||0,superPotions:data.player.superPotions||0,hyperPotions:data.player.hyperPotions||0,revives:data.player.revives||0,fireStones:data.player.fireStones||0,waterStones:data.player.waterStones||0,thunderStones:data.player.thunderStones||0,leafStones:data.player.leafStones||0,region:data.player.region||1,seen:new Set(data.player.seen||[]),caught:new Set(data.player.caught||[]),defeated:new Set(data.player.defeated||[]),tms:data.player.tms||[],reward10:data.player.reward10||false,reward50:data.player.reward50||false,reward100:data.player.reward100||false});
+    game.flags = {...game.flags,...data.flags};
+    if(data.story){ STORY.chapter = data.story.chapter||0; STORY.flags = {...STORY.flags,...data.story.flags}; STORY.mission = data.story.mission||"Explora el mundo"; document.getElementById("missionText").textContent = STORY.mission; }
+    game.player.party = []; (data.party||[]).forEach(pd=>{ const p = new Pokemon(pd.dexId,pd.level); p.xp = pd.xp||0; p.hp = pd.hp||p.maxHp; if(pd.moves) p.moves = pd.moves.slice(0,4); p.movePP = pd.movePP?pd.movePP.slice(0,p.moves.length):p.moves.map(()=>20); p.mega = !!pd.mega; p.isShiny = !!pd.isShiny; game.player.party.push(p); });
+    game.player.box = []; (data.box||[]).forEach(pd=>{ const p = new Pokemon(pd.dexId,pd.level); p.xp = pd.xp||0; p.hp = pd.hp||p.maxHp; if(pd.moves) p.moves = pd.moves.slice(0,4); p.movePP = pd.movePP?pd.movePP.slice(0,p.moves.length):p.moves.map(()=>20); p.mega = !!pd.mega; p.isShiny = !!pd.isShiny; game.player.box.push(p); });
+    const zoneId = data.zoneId && ZONES[data.zoneId] ? data.zoneId : "pueblo_inicio"; loadZone(zoneId);
+    if(data.playerPos){ player.position.set(data.playerPos.x,data.playerPos.y||0,data.playerPos.z); player.rotation.y = data.playerPos.yaw||0; player.userData.baseY = 0; camYaw = data.playerPos.camYaw||0; camPitch = data.playerPos.camPitch ?? 0.35; camDist = data.playerPos.camDist ?? 9; }
+    setTimeout(()=>{ if(game.player.party.length > 0) updateFollowingPokemon(0.01); },200);
+    return true;
+  } catch(e){ console.warn("Error cargando:",e); return false; }
+}
+function hasSave(){ return !!localStorage.getItem(SAVE_KEY); }
+function deleteSave(){ localStorage.removeItem(SAVE_KEY); }
+let saveNotifyTimer = null;
+function showSaveNotify(){ const el = document.getElementById("saveNotify"); el.classList.add("show"); clearTimeout(saveNotifyTimer); saveNotifyTimer = setTimeout(()=>el.classList.remove("show"),1800); }
+function autoSave(){ saveGame(); }
+setInterval(()=>{ if(game.state === "overworld" && game.flags.starter) autoSave(); },30000);
+
+const resetBtn = document.createElement("button");
+resetBtn.id = "resetBtn"; resetBtn.textContent = "🗑️"; resetBtn.title = "Borrar partida";
+resetBtn.onclick = ()=>{ if(confirm("¿Seguro que quieres borrar la partida?")){ deleteSave(); location.reload(); } };
+document.body.appendChild(resetBtn);
+
+let audioCtx = null,musicEnabled = true,musicMasterGain = null,musicLoopTimer = null;
+function initAudio(){ if(audioCtx) return; try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); musicMasterGain = audioCtx.createGain(); musicMasterGain.gain.value = 0.08; musicMasterGain.connect(audioCtx.destination); } catch(e){} }
+const NOTES = {C4:261.63,D4:293.66,E4:329.63,F4:349.23,G4:392,A4:440,B4:493.88,C5:523.25,D5:587.33,E5:659.25,F5:698.46,G5:783.99,A5:880,B5:987.77,C3:130.81,D3:146.83,E3:164.81,F3:174.61,G3:196,A3:220,B3:246.94,C2:65.41,G2:98,F2:87.31,A2:110,E2:82.41,D2:73.42};
+const MELODIES = {town:{tempo:0.32,bass:["C2","C2","G2","G2","F2","F2","G2","G2"],lead:["E4","G4","C5","G4","F4","A4","C5","A4"]},route:{tempo:0.28,bass:["A2","A2","E2","E2","F2","F2","G2","G2"],lead:["A4","C5","E5","C5","A4","G4","A4","C5"]},battle:{tempo:0.22,bass:["E2","E2","E2","E2","D2","D2","D2","D2"],lead:["E5","E5","F5","E5","D5","E5","F5","G5"]},league:{tempo:0.26,bass:["E2","E2","B2","B2","C2","C2","D2","D2"],lead:["B4","D5","F5","D5","B4","A4","B4","D5"]}};
+function playNote(freq,time,dur,type="triangle",vol=1){ if(!audioCtx || !musicMasterGain) return; const osc = audioCtx.createOscillator(),gain = audioCtx.createGain(); osc.type = type; osc.frequency.value = freq; gain.gain.setValueAtTime(0,time); gain.gain.linearRampToValueAtTime(vol,time + 0.01); gain.gain.exponentialRampToValueAtTime(0.001,time + dur); osc.connect(gain); gain.connect(musicMasterGain); osc.start(time); osc.stop(time + dur + 0.05); }
+function pickMelody(){ if(game.state === "battle") return battleState && battleState.kind === "champion" ? MELODIES.league : MELODIES.battle; if(!currentZoneData) return MELODIES.town; const t = currentZoneData.type; if(t === "route") return MELODIES.route; if(t === "league") return MELODIES.league; return MELODIES.town; }
+function startMusicLoop(){ if(!audioCtx) return; if(musicLoopTimer) clearTimeout(musicLoopTimer); const melody = pickMelody(); const tempo = melody.tempo; const now = audioCtx.currentTime + 0.05; for(let i=0;i<melody.bass.length;i++){ const t = now + i*tempo; playNote(NOTES[melody.bass[i]]||100,t,tempo*0.9,"triangle",0.6); if(melody.lead[i]) playNote(NOTES[melody.lead[i]]||400,t,tempo*0.8,"square",0.35); } const loopDur = melody.bass.length*tempo*1000; musicLoopTimer = setTimeout(()=>{ if(musicEnabled) startMusicLoop(); },loopDur - 50); }
+function stopMusicLoop(){ if(musicLoopTimer){ clearTimeout(musicLoopTimer); musicLoopTimer = null; } }
+document.getElementById("musicBtn").onclick = ()=>{ initAudio(); if(!audioCtx) return; if(audioCtx.state === "suspended") audioCtx.resume(); musicEnabled = !musicEnabled; document.getElementById("musicBtn").classList.toggle("off",!musicEnabled); if(musicEnabled){ if(musicMasterGain) musicMasterGain.gain.value = 0.08; startMusicLoop(); } else { if(musicMasterGain) musicMasterGain.gain.value = 0; stopMusicLoop(); } };
+function enableAudioOnFirstInteraction(){ const unlock = ()=>{ initAudio(); if(audioCtx && audioCtx.state === "suspended") audioCtx.resume(); if(musicEnabled && !musicLoopTimer) startMusicLoop(); document.removeEventListener("touchstart",unlock); document.removeEventListener("mousedown",unlock); document.removeEventListener("keydown",unlock); }; document.addEventListener("touchstart",unlock,{once:true}); document.addEventListener("mousedown",unlock,{once:true}); document.addEventListener("keydown",unlock,{once:true}); }
+
+function updateDayCycle(dt){
+  dayCycleTime += dt * 0.005; if(dayCycleTime > 1) dayCycleTime -= 1;
+  const angle = dayCycleTime * Math.PI * 2 - Math.PI/2; const sunY = Math.sin(angle) * 100;
+  if(sunLight){ sunLight.position.set(Math.cos(angle)*100,Math.max(20,sunY),40); const isDay = sunY > 30, isDusk = sunY > -20 && sunY < 30; sunLight.intensity = isDay ? 1.35 : (isDusk ? 0.7 : 0.15); if(isDusk){ sunLight.color.setHex(0xffb060); } else if(isDay){ sunLight.color.setHex(0xfff0c8); } else { sunLight.color.setHex(0x4466aa); } if(hemiLight) hemiLight.intensity = isDay ? 0.85 : (isDusk ? 0.5 : 0.2); }
+  updateSkySystem(dt);
+  updateParticles(dt);
+  const el = document.getElementById("timeIndicator"); let icon = "☀️", txt = "Día"; if(dayCycleTime < 0.2){ icon = "🌅"; txt = "Amanecer"; } else if(dayCycleTime < 0.5){ icon = "☀️"; txt = "Día"; } else if(dayCycleTime < 0.7){ icon = "🌇"; txt = "Atardecer"; } else { icon = "🌙"; txt = "Noche"; } el.textContent = icon + " " + txt;
+}
+
+function updateHUD(){ document.getElementById("badgeDisplay").textContent = `🏅 ${game.player.badges}/16`; document.getElementById("moneyDisplay").textContent = `₽ ${game.player.money}`; if(currentZoneData) document.getElementById("zoneDisplay").textContent = currentZoneData.name; }
+function updatePartyHUD(){ const el = document.getElementById("partyHUD"); el.innerHTML = ""; game.player.party.forEach(p=>{ const s = document.createElement("div"); s.className = "partySlot"; s.innerHTML = `<img src="${p.isShiny?SPRITE_SHINY(p.dexId):SPRITE(p.dexId)}"><div class="info"><div class="pname">${p.species}${p.isShiny?" ✨":""}</div><div class="plvl">Nv.${p.level}</div><div class="php"><div style="width:${100*Math.max(0,p.hp)/p.maxHp}%"></div></div></div>`; el.appendChild(s); }); }
+function toggleParty(){ const el = document.getElementById("party"); if(el.style.display==="block"){ el.style.display="none"; return; } el.style.display="block"; const list = document.getElementById("partyList"); list.innerHTML = ""; game.player.party.forEach(p=>{ const row = document.createElement("div"); row.className = "party-mon"; const xpNeed = xpForLevel(p.level+1); row.innerHTML = `<img src="${p.isShiny?SPRITE_SHINY(p.dexId):SPRITE(p.dexId)}"><div style="flex:1"><b>${p.species}${p.isShiny?" ✨":""}</b> Nv.${p.level} <span style="color:#29b6f6;font-size:10px">XP ${p.xp}/${xpNeed}</span><div class="hpmini"><div style="width:${100*p.hp/p.maxHp}%"></div></div></div>`; list.appendChild(row); }); if(game.player.box.length > 0){ const boxInfo = document.createElement("div"); boxInfo.style.cssText = "font-size:11px;color:#888;text-align:center;padding:6px;margin-top:6px;border-top:1px solid #333"; boxInfo.textContent = `Caja PC: ${game.player.box.length} Pokémon`; list.appendChild(boxInfo); } }
+function showRegion(txt){ const el = document.getElementById("regionText"); el.textContent = txt; el.style.opacity = 1; setTimeout(()=>{ el.style.opacity = 0; },2500); }
+
+function loop(){
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05,clock.getDelta());
+  updateDayCycle(dt);
+  if(game.state==="overworld"){
+    updatePlayer(dt);
+    updateOverworldPokemon(dt);
+    updateFollowingPokemon(dt);
+    if(!game.inInterior) checkEncounters(dt);
+    const px = player.position.x,pz = player.position.z;
+    let near = null;
+    if(game.inInterior && interiorState){
+      if(interiorState.type === "gym"){ if(Math.hypot(px,pz-10) < 2.5) near = "Salir del gimnasio"; else if(Math.hypot(px,pz+7) < 3) near = "Retar a " + interiorState.gym.name; }
+      else if(interiorState.type === "center"){ if(Math.hypot(px,pz-9) < 2.5) near = "Salir del Centro"; else if(Math.hypot(px,pz+7.5) < 2.5) near = "Hablar con Enfermera Joy"; else if(Math.hypot(px+7,pz+7) < 2.5) near = "Usar el PC"; }
+    } else {
+      for(const gm of gymMeshes){ if(Math.hypot(px-gm.pos[0],pz-gm.pos[1]) < 6.5){ near = game.player.defeated.has(gm.gym.id)?`${gm.gym.name} (vencido)`:`Entrar al Gimnasio de ${gm.gym.name}`; break; } }
+      if(!near) for(const m of marts) if(Math.hypot(px-m.x,pz-m.z) < 5.5){ near = "Entrar a la Tienda"; break; }
+      if(!near) for(const c of centers) if(Math.hypot(px-c.x,pz-c.z) < 5.5){ near = "Entrar al Centro Pokémon"; break; }
+      if(!near) for(const n of NPCs) if(Math.hypot(px-n.x,pz-n.z) < 3){ near = `Hablar con ${n.name}`; break; }
+      if(!near) for(const a of airports) if(Math.hypot(px-a.x,pz-a.z) < 12){ near = game.flags.planeUnlocked?"Volar en avión":"Aeropuerto (bloqueado)"; break; }
+    }
+    const promptEl = document.getElementById("prompt");
+    if(near){ promptEl.style.display="block"; promptEl.textContent = `[E/A] ${near}`; } else promptEl.style.display="none";
+    updateHUD();
+  }
+  renderer.render(scene,camera);
+}
+
+function init(){
+  initThree(); createPlayer(); setupControls(); updateHUD(); updatePartyHUD();
+  loadZone("pueblo_inicio"); setMission("Habla con el Profesor Oak"); player.position.set(0,0,60);
+  document.getElementById("loading").style.display = "none";
+  document.getElementById("title").style.display = "flex";
+  const startBtn = document.getElementById("startBtn");
+  const hasSaveData = hasSave();
+  if(hasSaveData){
+    startBtn.textContent = "CONTINUAR PARTIDA";
+    const newBtn = document.createElement("button"); newBtn.textContent = "NUEVA PARTIDA"; newBtn.style.cssText = "background:linear-gradient(135deg,#555,#222);color:#fff;border:2px solid #888;padding:12px 40px;font-size:16px;border-radius:40px;cursor:pointer;margin-top:8px";
+    newBtn.onclick = ()=>{ if(confirm("¿Empezar de cero? Se borrará la partida guardada.")){ deleteSave(); location.reload(); } };
+    startBtn.parentNode.insertBefore(newBtn,startBtn.nextSibling);
+  }
+  startBtn.onclick = ()=>{
+    document.getElementById("title").style.display = "none";
+    document.getElementById("hud").style.display = "flex";
+    document.getElementById("dexBtn").style.display = "flex";
+    document.getElementById("musicBtn").style.display = "flex";
+    game.state = "overworld";
+    if(hasSaveData){ const ok = loadGame(); if(ok){ updateHUD(); updatePartyHUD(); showRegion("Partida cargada ✓"); enableAudioOnFirstInteraction(); return; } }
+    showDialog("Profesor Oak",["¡Hola! Soy el Profesor Oak.","Bienvenido a Kanto Nova.","Acércate a mí y pulsa A para elegir tu Pokémon."]);
+    enableAudioOnFirstInteraction();
+  };
+  loop();
+}
+init();
+</script>
+</body>
+</html>
